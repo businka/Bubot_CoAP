@@ -1,9 +1,8 @@
-from distutils.core import setup
-import datetime
+from setuptools import setup
 
 setup(
-    name='CoAPthon3',
-    version='1.0.1+fb.' + datetime.datetime.now().strftime("%Y%m%d%H%M"),
+    name='Bubot_CoAP',
+    version='1.0.2',
     packages=[
         'coapthon',
         'coapthon.caching',
@@ -29,5 +28,5 @@ setup(
         'coapserver.py',
         'exampleresources.py',
     ],
-    requires=['sphinx', 'cachetools']
+    requires=['cachetools', 'cbor2']
 )
