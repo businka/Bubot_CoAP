@@ -1,4 +1,5 @@
 __author__ = 'Mikhail Razgovorov'
+
 from urllib.parse import SplitResult
 import socket
 import struct
@@ -19,10 +20,8 @@ class UdpCoapEndpoint(Endpoint):
         """
         Data structure that represent a EndPoint
         """
-        self._address = None
-        self._family = None
+        super().__init__(**kwargs)
         self._sock = None
-        self._multicast = None
         self._transport = None
         self._protocol = None
         self._multicast_addresses = None
@@ -47,26 +46,6 @@ class UdpCoapEndpoint(Endpoint):
     # def protocol(self, value):
     #     self._protocol = value
 
-    @property
-    def address(self):
-        return self._address
-
-    # @address.setter
-    # def address(self, value):
-    #     self._address = value
-
-    @property
-    def multicast(self):
-        return self._multicast
-
-    @property
-    def family(self):
-        return self._family
-
-    async def run(self, server, protocol_factory):
-        raise NotImplemented()
-
-
     @classmethod
     def init_by_socket(cls, sock: socket, is_multicast: bool = False):
         """
@@ -75,7 +54,7 @@ class UdpCoapEndpoint(Endpoint):
         :param sock: socket
         :param is_multicast: if socket is a multicast
         """
-        self = cls(**kwargs)
+        self = cls()
         self._is_multicast = is_multicast
         self._sock = sock
         return self

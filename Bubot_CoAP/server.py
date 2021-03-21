@@ -44,8 +44,9 @@ class Server:
 
         self.loop = kwargs.get('loop', asyncio.get_event_loop())
 
-        # self.stopped = threading.Event()
-        # self.stopped.clear()
+        self.stopped = threading.Event()
+        self.stopped.clear()
+
         self.to_be_stopped = []
         # self.purge = threading.Thread(target=self.purge)
         # self.purge.start()
@@ -219,10 +220,10 @@ class Server:
         :param endpoint: the endpoint to be added
         """
         return await self.endpointLayer.add_by_netloc(url, **kwargs)
-
-    def remove_endpoint(self, **kwargs):
-        return self.endpointLayer.remove(**kwargs)
-        pass
+    #
+    # def remove_endpoint(self, **kwargs):
+    #     return self.endpointLayer.remove(**kwargs)
+    #     pass
 
     @staticmethod
     def _wait_for_retransmit_thread(transaction):
@@ -309,7 +310,7 @@ class Server:
         """
         timer.cancel()
 
-    def _send_ack(self, transaction):
+    def send_ack(self, transaction):
         """
         Sends an ACK message for the request.
 

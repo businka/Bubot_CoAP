@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import binascii
+import socket
 
 from Bubot_CoAP import defines
 from Bubot_CoAP import utils
@@ -20,7 +21,9 @@ class Message(object):
         """
         self._type = None
         self._mid = None
+        self._scheme = None
         self._token = None
+        self._family = None
         self._options = []
         self._payload = None
         self._destination = None
@@ -143,6 +146,46 @@ class Message(object):
         self._token = None
 
     @property
+    def scheme(self):
+        """
+        Return the mid of the message.
+
+        :return: the MID
+        """
+        return self._scheme if self._scheme else 'coap'
+
+    @scheme.setter
+    def scheme(self, value):
+        """
+        Sets the MID of the message.
+
+        :type value: Integer
+        :param value: the MID
+        :raise AttributeError: if value is not int or cannot be represented on 16 bits.
+        """
+        self._scheme = value
+
+    @property
+    def family(self):
+        """
+        Return the mid of the message.
+
+        :return: the MID
+        """
+        return self._family
+
+    @family.setter
+    def family(self, value):
+        """
+        Sets the MID of the message.
+
+        :type value: Integer
+        :param value: the MID
+        :raise AttributeError: if value is not int or cannot be represented on 16 bits.
+        """
+        self._family = value
+
+    @property
     def options(self):
         """
         Return the options of the CoAP message.
@@ -209,6 +252,8 @@ class Message(object):
         """
         if value is not None and (not isinstance(value, tuple) or len(value)) != 2:
             raise AttributeError
+        if value:
+            self._family = socket.getaddrinfo(value[0], None)[0][0]
         self._destination = value
 
     @property

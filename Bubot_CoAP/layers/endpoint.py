@@ -1,6 +1,8 @@
 import logging
 from Bubot_CoAP.endpoint import Endpoint, supported_scheme
-from protocol import CoapProtocol
+from Bubot_CoAP.utils import parse_uri2
+from Bubot_CoAP.protocol import CoapProtocol
+
 
 import socket
 from urllib.parse import urlparse
@@ -23,13 +25,13 @@ class EndpointLayer:
     def unicast_endpoints(self):
         return self._unicast_endpoints
 
-    async def add_by_netloc(self, url: str, **kwargs):
-        url = urlparse(url)
+    async def add_by_netloc(self, uri: str, **kwargs):
+        _uri = parse_uri2(uri)
         try:
-            endpoint = supported_scheme[url.scheme]
+            endpoint = supported_scheme[_uri['scheme']]
         except KeyError:
-            raise TypeError(f'Unsupported scheme "{url.scheme}"')
-        address = (Endpoint.host_port_split(url.netloc))
+            raise TypeError(f'Unsupported scheme \'{_uri["scheme"]}\'')
+        address = _uri['address']
 
         multicast = kwargs.get('multicast', False)
         if address[0] == '' or address[0] is None:  # IPv4 default
@@ -43,7 +45,7 @@ class EndpointLayer:
             # address = (f'[{addr_info[4][0]}]', addr_info[4][1])
         else:
             addr_info = socket.getaddrinfo(address[0], address[1])[0]
-            family = address[0]
+            family = addr_info[0]
 
         result = []
         if family == socket.AF_INET:  # IPv4
@@ -55,7 +57,8 @@ class EndpointLayer:
                 result.append(await self.add(endpoint.init_multicast_ip6_by_address(address, **kwargs)))
             result.append(await self.add(endpoint.init_unicast_ip6_by_address(address, **kwargs)))
         else:
-            raise NotImplemented('Protocol not supported')
+            raise NotImplemented(f'Protocol not supported {family}')
+        return result
 
     async def add(self, endpoint: Endpoint):
         """
@@ -73,35 +76,29 @@ class EndpointLayer:
                 self._multicast_endpoints[key] = endpoint
             return self._multicast_endpoints[key]
         else:
+            scheme = endpoint.scheme
+            family = endpoint.family
             host, port = endpoint.address
-            if host not in self._unicast_endpoints:
-                self._unicast_endpoints[host] = {}
-            if port not in self._unicast_endpoints[host]:
+            if scheme not in self._unicast_endpoints:
+                self._unicast_endpoints[scheme] = {'default': endpoint}
+            if family not in self._unicast_endpoints[scheme]:
+                self._unicast_endpoints[scheme][family] = {'default': endpoint}
+            if host not in self._unicast_endpoints[scheme][family]:
+                self._unicast_endpoints[scheme][family][host] = {'default': endpoint}
+            if port not in self._unicast_endpoints[scheme][family][host]:
+                self._unicast_endpoints[scheme][family][host][port] = endpoint
                 await endpoint.run(self._server, CoapProtocol)
-                self._unicast_endpoints[host][port] = endpoint
-            return self._unicast_endpoints[host][port]
+            return endpoint
 
     def find_sending_endpoint(self, message):
-        dest_address = message.source
-        try:
-            unicast_endpoints = self._unicast_endpoints[dest_address]
-        except KeyError:
-            try:
-                family = socket.getaddrinfo(dest_address[0], None)[0][0]
-                if family == socket.AF_INET:
-                    unicast_endpoints = self._unicast_endpoints['']
-                elif family == socket.AF_INET6:
-                    unicast_endpoints = self._unicast_endpoints['::']
-                else:
-                    raise TypeError('not endpoint')
-            except KeyError:
-                raise TypeError('not endpoint')
-        try:
-            return unicast_endpoints[message.source[1]]
-        except KeyError:
-            for elem in unicast_endpoints:
-                return unicast_endpoints[elem]
-        raise TypeError('not endpoint')
+        source_address = message.source
+        scheme = message.scheme
+        dest_address = message.destination
+        if source_address:
+            return self._unicast_endpoints[message.scheme][message.family][source_address[0]][source_address[1]]
+        else:
+            family = socket.getaddrinfo(dest_address[0], None)[0][0]
+            return self._unicast_endpoints[scheme][family]['default']
 
     @staticmethod
     def get_key_by_address(address):
@@ -115,5 +112,9 @@ class EndpointLayer:
                 _ep.close()
 
         _close(self._multicast_endpoints)
-        for ip in list(self._unicast_endpoints):
-            _close(self._unicast_endpoints.pop(ip))
+        for scheme in list(self._unicast_endpoints):
+            for family in list(self._unicast_endpoints[scheme]):
+                for ip in list(self._unicast_endpoints[scheme][family]):
+                    _close(self._unicast_endpoints[scheme][family].pop(ip))
+                del self._unicast_endpoints[scheme][family]
+            del self._unicast_endpoints[scheme]

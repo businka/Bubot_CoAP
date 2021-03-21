@@ -3,11 +3,12 @@
 from queue import Queue
 import random
 import socket
+
+import logging
 import threading
 import unittest
 
-from example.coapclient import HelperClient
-from example.coapserver import CoAPServer
+from Bubot_CoAP.server import Server
 from Bubot_CoAP import defines
 from Bubot_CoAP.messages.message import Message
 from Bubot_CoAP.messages.option import Option
@@ -60,28 +61,31 @@ PAYLOAD = "Lorem ipsum dolor sit amet, consetetur sadipscing elitr,  sed diam no
           "erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd " \
           "gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet."
 
+logging.basicConfig(level=logging.DEBUG)
 
-class Tests(unittest.TestCase):
 
-    def setUp(self):
+class Tests(unittest.IsolatedAsyncioTestCase):
+
+    async def asyncSetUp(self) -> None:
         self.server_address = ("127.0.0.1", 5683)
         self.current_mid = random.randint(1, 1000)
         self.server_mid = random.randint(1000, 2000)
-        self.server = CoAPServer("127.0.0.1", 5683)
-        self.server_thread = threading.Thread(target=self.server.listen, args=(1,))
-        self.server_thread.start()
+        self.server = Server()
+        await self.server.add_endpoint(f'coap://{self.server_address[0]}:{self.server_address[1]}')
+        # self.server_thread = threading.Thread(target=self.server.listen, args=(1,))
+        # self.server_thread.start()
         self.queue = Queue()
 
-    def tearDown(self):
-        self.server.close()
-        self.server_thread.join(timeout=25)
+    async def asyncTearDown(self) -> None:
+        await self.server.close()
+        # self.server_thread.join(timeout=25)
         self.server = None
 
-    def _test_with_client(self, message_list):  # pragma: no cover
-        client = HelperClient(self.server_address)
+    async def _test_with_client(self, message_list):  # pragma: no cover
+        # client = HelperClient(self.server_address)
         for message, expected in message_list:
             if message is not None:
-                received_message = client.send_request(message)
+                received_message = await self.server.send_message(message)
             if expected is not None:
 
                 if expected.type is not None:
@@ -102,13 +106,13 @@ class Tests(unittest.TestCase):
                         option_value = getattr(expected, o.name.lower().replace("-", "_"))
                         option_value_rec = getattr(received_message, o.name.lower().replace("-", "_"))
                         self.assertEqual(option_value, option_value_rec)
-        client.stop()
+        # client.stop()
 
-    def _test_with_client_observe(self, message_list):  # pragma: no cover
-        client = HelperClient(self.server_address)
+    async def _test_with_client_observe(self, message_list):  # pragma: no cover
+        # client = HelperClient(self.server_address)
         for message, expected in message_list:
             if message is not None:
-                client.send_request(message, self.client_callback)
+                await self.server.send_message(message, self.client_callback)
             if expected is not None:
                 received_message = self.queue.get()
                 if expected.type is not None:
@@ -129,7 +133,7 @@ class Tests(unittest.TestCase):
                         option_value = getattr(expected, o.name.lower().replace("-", "_"))
                         option_value_rec = getattr(received_message, o.name.lower().replace("-", "_"))
                         self.assertEqual(option_value, option_value_rec)
-        client.stop()
+        # client.stop()
 
     def client_callback(self, response):
         print("Callback")
@@ -195,7 +199,7 @@ class Tests(unittest.TestCase):
                         self.assertEqual(option_value, option_value_rec)
         sock.close()
 
-    def test_not_allowed(self):
+    async def test_not_allowed(self):
         print("TEST_NOT_ALLOWED")
         path = "/void"
         req = Request()
@@ -265,7 +269,7 @@ class Tests(unittest.TestCase):
         exchange4 = (req, expected)
 
         self.current_mid += 1
-        self._test_with_client([exchange1, exchange2, exchange3, exchange4])
+        await self._test_with_client([exchange1, exchange2, exchange3, exchange4])
 
     def test_separate(self):
         print("TEST_SEPARATE")
@@ -1521,28 +1525,28 @@ class Tests(unittest.TestCase):
         req._mid = self.current_mid
         req.destination = self.server_address
         req.payload = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras sollicitudin fermentum ornare. " \
-                       "Cras accumsan tellus quis dui lacinia eleifend. Proin ultrices rutrum orci vitae luctus. " \
-                       "Nullam malesuada pretium elit, at aliquam odio vehicula in. Etiam nec maximus elit. " \
-                       "Etiam at erat ac ex ornare feugiat. Curabitur sed malesuada orci, id aliquet nunc. Phasellus " \
-                       "nec leo luctus, blandit lorem sit amet, interdum metus. Duis efficitur volutpat magna, ac " \
-                       "ultricies nibh aliquet sit amet. Etiam tempor egestas augue in hendrerit. Nunc eget augue " \
-                       "ultricies, dignissim lacus et, vulputate dolor. Nulla eros odio, fringilla vel massa ut, " \
-                       "facilisis cursus quam. Fusce faucibus lobortis congue. Fusce consectetur porta neque, id " \
-                       "sollicitudin velit maximus eu. Sed pharetra leo quam, vel finibus turpis cursus ac. " \
-                       "Aenean ac nisi massa. Cras commodo arcu nec ante tristique ullamcorper. Quisque eu hendrerit" \
-                       " urna. Cras fringilla eros ut nunc maximus, non porta nisl mollis. Aliquam in rutrum massa." \
-                       " Praesent tristique turpis dui, at ultricies lorem fermentum at. Vivamus sit amet ornare neque, " \
-                       "a imperdiet nisl. Quisque a iaculis libero, id tempus lacus. Aenean convallis est non justo " \
-                       "consectetur, a hendrerit enim consequat. In accumsan ante a egestas luctus. Etiam quis neque " \
-                       "nec eros vestibulum faucibus. Nunc viverra ipsum lectus, vel scelerisque dui dictum a. Ut orci " \
-                       "enim, ultrices a ultrices nec, pharetra in quam. Donec accumsan sit amet eros eget fermentum." \
-                       "Vivamus ut odio ac odio malesuada accumsan. Aenean vehicula diam at tempus ornare. Phasellus " \
-                       "dictum mauris a mi consequat, vitae mattis nulla fringilla. Ut laoreet tellus in nisl efficitur," \
-                       " a luctus justo tempus. Fusce finibus libero eget velit finibus iaculis. Morbi rhoncus purus " \
-                       "vel vestibulum ullamcorper. Sed ac metus in urna fermentum feugiat. Nulla nunc diam, sodales " \
-                       "aliquam mi id, varius porta nisl. Praesent vel nibh ac turpis rutrum laoreet at non odio. " \
-                       "Phasellus ut posuere mi. Suspendisse malesuada velit nec mauris convallis porta. Vivamus " \
-                       "sed ultrices sapien, at cras amet."
+                      "Cras accumsan tellus quis dui lacinia eleifend. Proin ultrices rutrum orci vitae luctus. " \
+                      "Nullam malesuada pretium elit, at aliquam odio vehicula in. Etiam nec maximus elit. " \
+                      "Etiam at erat ac ex ornare feugiat. Curabitur sed malesuada orci, id aliquet nunc. Phasellus " \
+                      "nec leo luctus, blandit lorem sit amet, interdum metus. Duis efficitur volutpat magna, ac " \
+                      "ultricies nibh aliquet sit amet. Etiam tempor egestas augue in hendrerit. Nunc eget augue " \
+                      "ultricies, dignissim lacus et, vulputate dolor. Nulla eros odio, fringilla vel massa ut, " \
+                      "facilisis cursus quam. Fusce faucibus lobortis congue. Fusce consectetur porta neque, id " \
+                      "sollicitudin velit maximus eu. Sed pharetra leo quam, vel finibus turpis cursus ac. " \
+                      "Aenean ac nisi massa. Cras commodo arcu nec ante tristique ullamcorper. Quisque eu hendrerit" \
+                      " urna. Cras fringilla eros ut nunc maximus, non porta nisl mollis. Aliquam in rutrum massa." \
+                      " Praesent tristique turpis dui, at ultricies lorem fermentum at. Vivamus sit amet ornare neque, " \
+                      "a imperdiet nisl. Quisque a iaculis libero, id tempus lacus. Aenean convallis est non justo " \
+                      "consectetur, a hendrerit enim consequat. In accumsan ante a egestas luctus. Etiam quis neque " \
+                      "nec eros vestibulum faucibus. Nunc viverra ipsum lectus, vel scelerisque dui dictum a. Ut orci " \
+                      "enim, ultrices a ultrices nec, pharetra in quam. Donec accumsan sit amet eros eget fermentum." \
+                      "Vivamus ut odio ac odio malesuada accumsan. Aenean vehicula diam at tempus ornare. Phasellus " \
+                      "dictum mauris a mi consequat, vitae mattis nulla fringilla. Ut laoreet tellus in nisl efficitur," \
+                      " a luctus justo tempus. Fusce finibus libero eget velit finibus iaculis. Morbi rhoncus purus " \
+                      "vel vestibulum ullamcorper. Sed ac metus in urna fermentum feugiat. Nulla nunc diam, sodales " \
+                      "aliquam mi id, varius porta nisl. Praesent vel nibh ac turpis rutrum laoreet at non odio. " \
+                      "Phasellus ut posuere mi. Suspendisse malesuada velit nec mauris convallis porta. Vivamus " \
+                      "sed ultrices sapien, at cras amet."
 
         expected = Response()
         expected.type = defines.Types["ACK"]
