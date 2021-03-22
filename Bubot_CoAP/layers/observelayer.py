@@ -77,7 +77,7 @@ class ObserveLayer(object):
             del self._relations[key_token]
         return message
 
-    def receive_request(self, transaction):
+    async def receive_request(self, transaction):
         """
         Manage the observe option in the request end eventually initialize the client for adding to
         the list of observers or remove from the list.

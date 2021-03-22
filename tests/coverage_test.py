@@ -3,7 +3,7 @@
 from queue import Queue
 import random
 import socket
-
+import asyncio
 import logging
 import threading
 import unittest
@@ -15,6 +15,10 @@ from Bubot_CoAP.messages.option import Option
 from Bubot_CoAP.messages.request import Request
 from Bubot_CoAP.messages.response import Response
 from Bubot_CoAP.serializer import Serializer
+
+from tests.exampleresources import BasicResource, Long, Separate, Storage, Big, voidResource, XMLResource, ETAGResource, \
+    Child, \
+    MultipleEncodingResource, AdvancedResource, AdvancedResourceSeparate
 
 __author__ = 'Giacomo Tanganelli'
 __version__ = "2.0"
@@ -68,10 +72,24 @@ class Tests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self) -> None:
         self.server_address = ("127.0.0.1", 5683)
+        self.client_address = ("127.0.0.1", 5684)
         self.current_mid = random.randint(1, 1000)
         self.server_mid = random.randint(1000, 2000)
         self.server = Server()
         await self.server.add_endpoint(f'coap://{self.server_address[0]}:{self.server_address[1]}')
+        self.server.add_resource('basic/', BasicResource())
+        self.server.add_resource('storage/', Storage())
+        self.server.add_resource('separate/', Separate())
+        self.server.add_resource('long/', Long())
+        self.server.add_resource('big/', Big())
+        self.server.add_resource('void/', voidResource())
+        self.server.add_resource('xml/', XMLResource())
+        self.server.add_resource('encoding/', MultipleEncodingResource())
+        self.server.add_resource('etag/', ETAGResource())
+        self.server.add_resource('child/', Child())
+        self.server.add_resource('advanced/', AdvancedResource())
+        self.server.add_resource('advancedSeparate/', AdvancedResourceSeparate())
+
         # self.server_thread = threading.Thread(target=self.server.listen, args=(1,))
         # self.server_thread.start()
         self.queue = Queue()
@@ -82,12 +100,12 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.server = None
 
     async def _test_with_client(self, message_list):  # pragma: no cover
-        # client = HelperClient(self.server_address)
+        client = Server()
+        await client.add_endpoint(f'coap://{self.client_address[0]}:{self.client_address[1]}')
         for message, expected in message_list:
             if message is not None:
-                received_message = await self.server.send_message(message)
+                received_message = await client.send_message(message)
             if expected is not None:
-
                 if expected.type is not None:
                     self.assertEqual(received_message.type, expected.type)
                 if expected.mid is not None:
@@ -106,7 +124,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
                         option_value = getattr(expected, o.name.lower().replace("-", "_"))
                         option_value_rec = getattr(received_message, o.name.lower().replace("-", "_"))
                         self.assertEqual(option_value, option_value_rec)
-        # client.stop()
+        await client.close()
 
     async def _test_with_client_observe(self, message_list):  # pragma: no cover
         # client = HelperClient(self.server_address)
@@ -139,7 +157,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         print("Callback")
         self.queue.put(response)
 
-    def _test_plugtest(self, message_list):  # pragma: no cover
+    async def _test_plugtest(self, message_list):  # pragma: no cover
         serializer = Serializer()
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         for message, expected in message_list:
@@ -147,6 +165,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
                 datagram = serializer.serialize(message)
                 sock.sendto(datagram, message.destination)
             if expected is not None:
+                await asyncio.sleep(0.1)
                 datagram, source = sock.recvfrom(4096)
                 received_message = serializer.deserialize(datagram, source)
                 if expected.type is not None:
@@ -169,7 +188,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
                         self.assertEqual(option_value, option_value_rec)
         sock.close()
 
-    def _test_datagram(self, message_list):  # pragma: no cover
+    async def _test_datagram(self, message_list):  # pragma: no cover
         serializer = Serializer()
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         for message, expected in message_list:
@@ -177,6 +196,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
                 datagram, destination = message
                 sock.sendto(datagram, destination)
             if expected is not None:
+                await asyncio.sleep(0.1)
                 datagram, source = sock.recvfrom(4096)
                 received_message = serializer.deserialize(datagram, source)
                 if expected.type is not None:
@@ -271,7 +291,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.current_mid += 1
         await self._test_with_client([exchange1, exchange2, exchange3, exchange4])
 
-    def test_separate(self):
+    async def test_separate(self):
         print("TEST_SEPARATE")
         path = "/separate"
 
@@ -344,9 +364,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange4 = (req, expected)
         self.current_mid += 1
 
-        self._test_with_client([exchange1, exchange2, exchange3, exchange4])
+        await self._test_with_client([exchange1, exchange2, exchange3, exchange4])
 
-    def test_post(self):
+    async def test_post(self):
         print("TEST_POST")
         path = "/storage/new_res?id=1"
 
@@ -442,9 +462,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange5 = (req, expected)
         self.current_mid += 1
 
-        self._test_with_client([exchange1, exchange2, exchange3, exchange4, exchange5])
+        await self._test_with_client([exchange1, exchange2, exchange3, exchange4, exchange5])
 
-    def test_post_block(self):
+    async def test_post_block(self):
         print("TEST_POST_BLOCK")
         path = "/storage/new_res"
         req = Request()
@@ -546,9 +566,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange5 = (req, expected)
         self.current_mid += 1
 
-        self._test_plugtest([exchange1, exchange2, exchange3, exchange4, exchange5])
+        await self._test_plugtest([exchange1, exchange2, exchange3, exchange4, exchange5])
 
-    def test_get_block(self):
+    async def test_get_block(self):
         print("TEST_GET_BLOCK")
         path = "/big"
 
@@ -741,10 +761,10 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange8 = (req, expected)
         self.current_mid += 1
 
-        self._test_plugtest([exchange0, exchange1, exchange2, exchange3, exchange4,
+        await self._test_plugtest([exchange0, exchange1, exchange2, exchange3, exchange4,
                              exchange5, exchange6, exchange7, exchange8])
 
-    def test_post_block_big(self):
+    async def test_post_block_big(self):
         print("TEST_POST_BLOCK_BIG")
         path = "/big"
         req = Request()
@@ -887,9 +907,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange7 = (req, expected)
         self.current_mid += 1
 
-        self._test_plugtest([exchange1, exchange2, exchange3, exchange4, exchange5, exchange6, exchange7])
+        await self._test_plugtest([exchange1, exchange2, exchange3, exchange4, exchange5, exchange6, exchange7])
 
-    def test_options(self):
+    async def test_options(self):
         print("TEST_OPTIONS")
         path = "/storage/new_res"
 
@@ -965,9 +985,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange3 = (req, expected)
         self.current_mid += 1
 
-        self._test_with_client([exchange1, exchange2, exchange3])
+        await self._test_with_client([exchange1, exchange2, exchange3])
 
-    def test_long_options(self):
+    async def test_long_options(self):
         """
         Test processing of options with extended length
         """
@@ -997,7 +1017,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange1 = (req, expected)
         self.current_mid += 1
 
-        self._test_with_client([exchange1])
+        await self._test_with_client([exchange1])
 
         # This option (244) should be silently ignored by the server
         req = (b'\x40\x01\x01\x01\xd6\xe7\x01\x01\x01\x01\x00\x00', self.server_address)
@@ -1034,9 +1054,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange23 = (req, expected)
         self.current_mid += 1
 
-        self._test_datagram([exchange21, exchange22, exchange23])
+        await self._test_datagram([exchange21, exchange22, exchange23])
 
-    def test_content_type(self):
+    async def test_content_type(self):
         print("TEST_CONTENT_TYPE")
         path = "/storage/new_res"
 
@@ -1223,10 +1243,10 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange10 = (req, expected)
         self.current_mid += 1
 
-        self._test_with_client([exchange1, exchange2, exchange3, exchange4, exchange5,
+        await self._test_with_client([exchange1, exchange2, exchange3, exchange4, exchange5,
                                 exchange6, exchange7, exchange8, exchange9, exchange10])
 
-    def test_ETAG(self):
+    async def test_ETAG(self):
         print("TEST_ETAG")
         path = "/etag"
 
@@ -1304,9 +1324,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange4 = (req, expected)
         self.current_mid += 1
 
-        self._test_with_client([exchange1, exchange2, exchange3, exchange4])
+        await self._test_with_client([exchange1, exchange2, exchange3, exchange4])
 
-    def test_child(self):
+    async def test_child(self):
         print("TEST_CHILD")
         path = "/child"
 
@@ -1381,9 +1401,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange4 = (req, expected)
         self.current_mid += 1
 
-        self._test_with_client([exchange1, exchange2, exchange3, exchange4])
+        await self._test_with_client([exchange1, exchange2, exchange3, exchange4])
 
-    def test_not_found(self):
+    async def test_not_found(self):
         print("TEST_not_found")
         path = "/not_found"
 
@@ -1457,9 +1477,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange4 = (req, expected)
         self.current_mid += 1
 
-        self._test_with_client([exchange1, exchange2, exchange3, exchange4])
+        await self._test_with_client([exchange1, exchange2, exchange3, exchange4])
 
-    def test_invalid(self):
+    async def test_invalid(self):
         print("TEST_INVALID")
 
         # version
@@ -1512,9 +1532,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
 
         exchange5 = (req, expected)
 
-        self._test_datagram([exchange1, exchange2, exchange3, exchange4, exchange5])
+        await self._test_datagram([exchange1, exchange2, exchange3, exchange4, exchange5])
 
-    def test_post_block_big_client(self):
+    async def test_post_block_big_client(self):
         print("TEST_POST_BLOCK_BIG_CLIENT")
         path = "/big"
         req = Request()
@@ -1558,9 +1578,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange1 = (req, expected)
         self.current_mid += 1
 
-        self._test_with_client([exchange1])
+        await self._test_with_client([exchange1])
 
-    def test_observe_client(self):
+    async def test_observe_client(self):
         print("TEST_OBSERVE_CLIENT")
         path = "/basic"
 
@@ -1592,7 +1612,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         exchange2 = (req, None)
         self.current_mid += 1
 
-        self._test_with_client_observe([exchange1, exchange2])
+        await self._test_with_client_observe([exchange1, exchange2])
 
 
 if __name__ == '__main__':

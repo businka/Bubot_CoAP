@@ -1,6 +1,6 @@
-from asyncio import DatagramProtocol
+from asyncio import DatagramProtocol, BaseProtocol
 import logging
-
+import asyncio
 import logging
 import random
 import socket
@@ -19,14 +19,10 @@ from Bubot_CoAP.serializer import Serializer
 logger = logging.getLogger(__name__)
 
 
-class CoapProtocol:
+class CoapProtocol(DatagramProtocol):
     def __init__(self, server, endpoint, **kwargs):
         self.server = server
         self.endpoint = endpoint
-        self.transport = None
-
-    def connection_made(self, transport):
-        self.transport = transport
 
     def datagram_received(self, data, client_address):
         try:
@@ -41,15 +37,11 @@ class CoapProtocol:
 
             logger.info("receive_datagram - " + str(message))
             if isinstance(message, Request):
-                self.datagram_received_request(message)
+                self.server.loop.create_task(self.datagram_received_request(message))
             elif isinstance(message, Response):
-                self.datagram_received_response(message)
+                self.server.loop.create_task(self.datagram_received_response(message))
             else:  # is Message
-                transaction = self.server.messageLayer.receive_empty(message)
-                if transaction is not None:
-                    with transaction:
-                        self.server.blockLayer.receive_empty(message, transaction)
-                        self.server.observeLayer.receive_empty(message, transaction)
+                self.server.loop.create_task(self.datagram_received_message(message))
 
         except RuntimeError:
             logger.exception("Exception with Executor")
@@ -70,8 +62,8 @@ class CoapProtocol:
         self.server.send_datagram(rst)
         return
 
-    def datagram_received_request(self, message):
-        transaction = self.server.messageLayer.receive_request(message)
+    async def datagram_received_request(self, message):
+        transaction = await self.server.messageLayer.receive_request(message)
         if transaction.request.duplicated and transaction.completed:
             logger.debug("message duplicated, transaction completed")
             if transaction.response is not None:
@@ -79,21 +71,17 @@ class CoapProtocol:
             return
         elif transaction.request.duplicated and not transaction.completed:
             logger.debug("message duplicated, transaction NOT completed")
-            self.server.send_ack(transaction)
+            await self.server.send_ack(transaction)
             return
-        args = (transaction,)
-        t = threading.Thread(target=self.server.receive_request, args=args)
-        t.start()
-        # self.server.loop.create_task(self.server.receive_request(transaction))
-        # self.receive_datagram(data, client_address)
+        await self.server.receive_request(transaction)
 
-    def datagram_received_response(self, message):
+    async def datagram_received_response(self, message):
         transaction, send_ack = self.server.messageLayer.receive_response(message)
         if transaction is None:  # pragma: no cover
             return
-        self.server._wait_for_retransmit_thread(transaction)
+        await self.server.wait_for_retransmit_thread(transaction)
         if send_ack:
-            self.server._send_ack(transaction)
+            await self.server.send_ack(transaction)
         self.server.blockLayer.receive_response(transaction)
         if transaction.block_transfer:
             self.server._send_block_request(transaction)
@@ -110,3 +98,10 @@ class CoapProtocol:
             self.server.callbackLayer.set_result(transaction.response)
         else:
             self.server.callbackLayer.set_result(transaction.response)
+
+    async def datagram_received_message(self, message):
+        transaction = self.server.messageLayer.receive_empty(message)
+        if transaction is not None:
+            async with transaction.lock:
+                self.server.blockLayer.receive_empty(message, transaction)
+                self.server.observeLayer.receive_empty(message, transaction)

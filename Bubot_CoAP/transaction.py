@@ -1,4 +1,5 @@
-import threading
+import asyncio
+
 
 __author__ = 'Giacomo Tanganelli'
 
@@ -26,16 +27,11 @@ class Transaction(object):
         self.separate_timer = None
         self.retransmit_thread = None
         self.retransmit_stop = None
-        self._lock = threading.RLock()
+        self.lock = asyncio.Lock()
+        # self.timer = None
 
         self.cacheHit = False
         self.cached_element = None
-
-    def __enter__(self):
-        self._lock.acquire()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._lock.release()
 
     @property
     def response(self):

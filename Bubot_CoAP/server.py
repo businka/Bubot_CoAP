@@ -1,12 +1,6 @@
-import time
 import logging
 import asyncio
 import random
-import socket
-import struct
-import threading
-import collections
-from urllib.parse import urlparse
 
 from Bubot_CoAP import defines
 from Bubot_CoAP.layers.blocklayer import BlockLayer
@@ -17,12 +11,10 @@ from Bubot_CoAP.layers.resourcelayer import ResourceLayer
 from Bubot_CoAP.layers.callback import CallbackLayer
 from Bubot_CoAP.messages.message import Message
 from Bubot_CoAP.messages.request import Request
-from Bubot_CoAP.messages.response import Response
 from Bubot_CoAP.resources.resource import Resource
 from Bubot_CoAP.serializer import Serializer
-from Bubot_CoAP.utils import Tree
+from Bubot_CoAP.utils import Tree, Timer
 from Bubot_CoAP.layers.endpoint import EndpointLayer
-from Bubot_CoAP.endpoint import Endpoint, supported_scheme
 
 __author__ = 'Giacomo Tanganelli'
 
@@ -44,12 +36,11 @@ class Server:
 
         self.loop = kwargs.get('loop', asyncio.get_event_loop())
 
-        self.stopped = threading.Event()
+        self.stopped = asyncio.Event()
         self.stopped.clear()
 
         self.to_be_stopped = []
-        # self.purge = threading.Thread(target=self.purge)
-        # self.purge.start()
+        self.loop.create_task(self.purge())
         self.endpointLayer = EndpointLayer(self)
         self.messageLayer = MessageLayer(starting_mid)
         self.blockLayer = BlockLayer()
@@ -65,13 +56,16 @@ class Server:
         self._serializer = None
         self._cb_ignore_listen_exception = cb_ignore_listen_exception
 
-    def purge(self):
+    async def purge(self):
         """
         Clean old transactions
 
         """
-        while not self.stopped.isSet():
-            self.stopped.wait(timeout=defines.EXCHANGE_LIFETIME)
+        while not self.stopped.is_set():
+            try:
+                await asyncio.wait_for(self.stopped.wait(), defines.EXCHANGE_LIFETIME)
+            except asyncio.TimeoutError:
+                pass
             self.messageLayer.purge()
 
     async def close(self):
@@ -80,52 +74,53 @@ class Server:
 
         """
         logger.info("Stop server")
-        # self.stopped.set()
-        # for event in self.to_be_stopped:
-        #     event.set()
+        self.stopped.set()
+        for event in self.to_be_stopped:
+            event.set()
+        await asyncio.sleep(0.001)
         self.endpointLayer.close()
 
-    def receive_request(self, transaction):
+    async def receive_request(self, transaction):
         """
         Handle requests coming from the udp socket.
 
         :param transaction: the transaction created to manage the request
         """
 
-        with transaction:
+        async with transaction.lock:
 
-            transaction.separate_timer = self._start_separate_timer(transaction)
+            transaction.separate_timer = await self._start_separate_timer(transaction)
 
             self.blockLayer.receive_request(transaction)
 
             if transaction.block_transfer:
-                self._stop_separate_timer(transaction.separate_timer)
+                await self._stop_separate_timer(transaction.separate_timer)
                 self.messageLayer.send_response(transaction)
                 self.send_datagram(transaction.response)
                 return
 
-            self.observeLayer.receive_request(transaction)
+            await self.observeLayer.receive_request(transaction)
 
-            self.requestLayer.receive_request(transaction)
+            await self.requestLayer.receive_request(transaction)
 
             if transaction.resource is not None and transaction.resource.changed:
-                self.notify(transaction.resource)
+                await self.notify(transaction.resource)
                 transaction.resource.changed = False
             elif transaction.resource is not None and transaction.resource.deleted:
-                self.notify(transaction.resource)
+                await self.notify(transaction.resource)
                 transaction.resource.deleted = False
 
             self.observeLayer.send_response(transaction)
 
             self.blockLayer.send_response(transaction)
 
-            self._stop_separate_timer(transaction.separate_timer)
+            await self._stop_separate_timer(transaction.separate_timer)
 
             self.messageLayer.send_response(transaction)
 
             if transaction.response is not None:
                 if transaction.response.type == defines.Types["CON"]:
-                    self._start_retransmission(transaction, transaction.response)
+                    await self.start_retransmission(transaction, transaction.response)
                 self.send_datagram(transaction.response)
 
     async def send_message(self, message, no_response=False):
@@ -140,7 +135,7 @@ class Server:
             transaction = self.messageLayer.send_request(request)
             self.send_datagram(transaction.request)
             if transaction.request.type == defines.Types["CON"]:
-                self._start_retransmission(transaction, transaction.request)
+                await self.start_retransmission(transaction, transaction.request)
             return await self.callbackLayer.wait(request)
         elif isinstance(message, Message):
             message = self.observeLayer.send_empty(message)
@@ -226,7 +221,7 @@ class Server:
     #     pass
 
     @staticmethod
-    def _wait_for_retransmit_thread(transaction):
+    async def wait_for_retransmit_thread(transaction):
         """
         Only one retransmit thread at a time, wait for other to finish
 
@@ -234,10 +229,10 @@ class Server:
         if hasattr(transaction, 'retransmit_thread'):
             while transaction.retransmit_thread is not None:
                 logger.debug("Waiting for retransmit thread to finish ...")
-                time.sleep(0.01)
+                await asyncio.sleep(0.01)
                 continue
 
-    def _start_retransmission(self, transaction, message):
+    async def start_retransmission(self, transaction, message):
         """
         Start the retransmission task.
 
@@ -246,16 +241,15 @@ class Server:
         :type message: Message
         :param message: the message that needs the retransmission task
         """
-        with transaction:
+        async with transaction.lock:
             if message.type == defines.Types['CON']:
                 future_time = random.uniform(defines.ACK_TIMEOUT, (defines.ACK_TIMEOUT * defines.ACK_RANDOM_FACTOR))
-                transaction.retransmit_thread = threading.Thread(target=self._retransmit,
-                                                                 args=(transaction, message, future_time, 0))
-                transaction.retransmit_stop = threading.Event()
+                transaction.retransmit_thread = self.loop.create_task(self._retransmit(transaction, message, future_time, 0))
+                transaction.retransmit_stop = asyncio.Event()
                 self.to_be_stopped.append(transaction.retransmit_stop)
-                transaction.retransmit_thread.start()
+                await asyncio.sleep(0.001)
 
-    def _retransmit(self, transaction, message, future_time, retransmit_count):
+    async def _retransmit(self, transaction, message, future_time, retransmit_count):
         """
         Thread function to retransmit the message in the future
 
@@ -264,15 +258,21 @@ class Server:
         :param future_time: the amount of time to wait before a new attempt
         :param retransmit_count: the number of retransmissions
         """
-        with transaction:
+        async with transaction.lock:
+            logger.debug("retransmit loop ... enter")
             while retransmit_count < defines.MAX_RETRANSMIT and (not message.acknowledged and not message.rejected) \
-                    and not self.stopped.isSet():
+                    and not self.stopped.is_set():
                 if transaction.retransmit_stop is not None:
-                    transaction.retransmit_stop.wait(timeout=future_time)
-                if not message.acknowledged and not message.rejected and not self.stopped.isSet():
+                    try:
+                        await asyncio.wait_for(transaction.retransmit_stop.wait(), future_time)
+                    except asyncio.TimeoutError:
+                        pass
+                if not message.acknowledged and not message.rejected and not self.stopped.is_set():
                     retransmit_count += 1
                     future_time *= 2
-                    self.send_datagram(message)
+                    if retransmit_count < defines.MAX_RETRANSMIT:
+                        logger.debug("retransmit loop ... retransmit Request")
+                        self.send_datagram(message)
 
             if message.acknowledged or message.rejected:
                 message.timeouted = False
@@ -282,14 +282,19 @@ class Server:
                 if message.observe is not None:
                     self.observeLayer.remove_subscriber(message)
 
+                # Inform the user, that nothing was received
+                # self._callback(None)
+                a = 1
+
             try:
                 self.to_be_stopped.remove(transaction.retransmit_stop)
             except ValueError:
                 pass
             transaction.retransmit_stop = None
             transaction.retransmit_thread = None
+            logger.debug("retransmit loop ... exit")
 
-    def _start_separate_timer(self, transaction):
+    async def _start_separate_timer(self, transaction):
         """
         Start a thread to handle separate mode.
 
@@ -297,20 +302,20 @@ class Server:
         :param transaction: the transaction that is in processing
         :rtype : the Timer object
         """
-        t = threading.Timer(defines.ACK_TIMEOUT, self._send_ack, (transaction,))
-        t.start()
+        t = Timer(defines.ACK_TIMEOUT, self.send_ack, (transaction,))
+        await asyncio.sleep(0.001)
         return t
 
     @staticmethod
-    def _stop_separate_timer(timer):
+    async def _stop_separate_timer(timer):
         """
         Stop the separate Thread if an answer has been already provided to the client.
 
         :param timer: The Timer object
         """
-        timer.cancel()
+        await timer.cancel()
 
-    def send_ack(self, transaction):
+    async def send_ack(self, transaction):
         """
         Sends an ACK message for the request.
 
@@ -319,13 +324,13 @@ class Server:
 
         ack = Message()
         ack.type = defines.Types['ACK']
-        with transaction:
+        async with transaction.lock:
             if not transaction.request.acknowledged and transaction.request.type == defines.Types["CON"]:
                 ack = self.messageLayer.send_empty(transaction, transaction.request, ack)
                 if ack.type is not None and ack.mid is not None:
                     self.send_datagram(ack)
 
-    def notify(self, resource):
+    async def notify(self, resource):
         """
         Notifies the observers of a certain resource.
 
@@ -342,6 +347,6 @@ class Server:
                 transaction = self.messageLayer.send_response(transaction)
                 if transaction.response is not None:
                     if transaction.response.type == defines.Types["CON"]:
-                        self._start_retransmission(transaction, transaction.response)
+                        await self.start_retransmission(transaction, transaction.response)
 
                     self.send_datagram(transaction.response)

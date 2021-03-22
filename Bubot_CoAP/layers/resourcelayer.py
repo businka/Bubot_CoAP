@@ -18,7 +18,7 @@ class ResourceLayer(object):
         """
         self._parent = parent
 
-    def edit_resource(self, transaction, path):
+    async def edit_resource(self, transaction, path):
         """
         Render a POST on an already created resource.
 
@@ -37,11 +37,11 @@ class ResourceLayer(object):
 
         method = getattr(resource_node, "render_POST", None)
         try:
-            resource = method(request=transaction.request)
+            resource = await method(request=transaction.request)
         except NotImplementedError:
             try:
                 method = getattr(resource_node, "render_POST_advanced", None)
-                ret = method(request=transaction.request, response=transaction.response)
+                ret = await method(request=transaction.request, response=transaction.response)
                 if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
                         and isinstance(ret[0], Resource):
                     # Advanced handler
@@ -57,7 +57,7 @@ class ResourceLayer(object):
                         and isinstance(ret[0], Resource):
                     # Advanced handler separate
                     resource, response, callback = ret
-                    ret = self._handle_separate_advanced(transaction, callback)
+                    ret = await self._handle_separate_advanced(transaction, callback)
                     if not isinstance(ret, tuple) or \
                             not (isinstance(ret[0], Resource) and isinstance(ret[1], Response)):  # pragma: no cover
                         transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
@@ -80,7 +80,7 @@ class ResourceLayer(object):
             pass
         elif isinstance(resource, tuple) and len(resource) == 2:
             resource, callback = resource
-            resource = self._handle_separate(transaction, callback)
+            resource = await self._handle_separate(transaction, callback)
             if not isinstance(resource, Resource):  # pragma: no cover
                 transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
                 return transaction
@@ -118,7 +118,7 @@ class ResourceLayer(object):
 
         return transaction
 
-    def add_resource(self, transaction, parent_resource, lp):
+    async def add_resource(self, transaction, parent_resource, lp):
         """
         Render a POST on a new resource.
 
@@ -129,10 +129,10 @@ class ResourceLayer(object):
         """
         method = getattr(parent_resource, "render_POST", None)
         try:
-            resource = method(request=transaction.request)
+            resource = await method(request=transaction.request)
         except NotImplementedError:
             try:
-                method = getattr(parent_resource, "render_POST_advanced", None)
+                method = await getattr(parent_resource, "render_POST_advanced", None)
                 ret = method(request=transaction.request, response=transaction.response)
                 if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
                         and isinstance(ret[0], Resource):
@@ -150,7 +150,7 @@ class ResourceLayer(object):
                         and isinstance(ret[0], Resource):
                     # Advanced handler separate
                     resource, response, callback = ret
-                    ret = self._handle_separate_advanced(transaction, callback)
+                    ret = await self._handle_separate_advanced(transaction, callback)
                     if not isinstance(ret, tuple) or \
                             not (isinstance(ret[0], Resource) and isinstance(ret[1], Response)):  # pragma: no cover
                         transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
@@ -173,7 +173,7 @@ class ResourceLayer(object):
             pass
         elif isinstance(resource, tuple) and len(resource) == 2:
             resource, callback = resource
-            resource = self._handle_separate(transaction, callback)
+            resource = await self._handle_separate(transaction, callback)
             if not isinstance(resource, Resource):  # pragma: no cover
                 transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
                 return transaction
@@ -209,7 +209,7 @@ class ResourceLayer(object):
 
         return transaction
 
-    def create_resource(self, path, transaction):
+    async def create_resource(self, path, transaction):
         """
         Render a POST request.
 
@@ -223,7 +223,7 @@ class ResourceLayer(object):
         for i in t:
             if i == path:
                 # Resource already present
-                return self.edit_resource(transaction, path)
+                return await self.edit_resource(transaction, path)
             elif len(i) > max_len:
                 imax = i
                 max_len = len(i)
@@ -231,12 +231,12 @@ class ResourceLayer(object):
         lp = path
         parent_resource = self._parent.root[imax]
         if parent_resource.allow_children:
-            return self.add_resource(transaction, parent_resource, lp)
+            return await self.add_resource(transaction, parent_resource, lp)
         else:
             transaction.response.code = defines.Codes.METHOD_NOT_ALLOWED.number
             return transaction
 
-    def update_resource(self, transaction):
+    async def update_resource(self, transaction):
         """
         Render a PUT request.
 
@@ -257,11 +257,11 @@ class ResourceLayer(object):
         method = getattr(transaction.resource, "render_PUT", None)
 
         try:
-            resource = method(request=transaction.request)
+            resource = await method(request=transaction.request)
         except NotImplementedError:
             try:
                 method = getattr(transaction.resource, "render_PUT_advanced", None)
-                ret = method(request=transaction.request, response=transaction.response)
+                ret = await method(request=transaction.request, response=transaction.response)
                 if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
                         and isinstance(ret[0], Resource):
                     # Advanced handler
@@ -277,7 +277,7 @@ class ResourceLayer(object):
                         and isinstance(ret[0], Resource):
                     # Advanced handler separate
                     resource, response, callback = ret
-                    ret = self._handle_separate_advanced(transaction, callback)
+                    ret = await self._handle_separate_advanced(transaction, callback)
                     if not isinstance(ret, tuple) or \
                             not (isinstance(ret[0], Resource) and isinstance(ret[1], Response)):  # pragma: no cover
                         transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
@@ -300,7 +300,7 @@ class ResourceLayer(object):
             pass
         elif isinstance(resource, tuple) and len(resource) == 2:
             resource, callback = resource
-            resource = self._handle_separate(transaction, callback)
+            resource = await self._handle_separate(transaction, callback)
             if not isinstance(resource, Resource):  # pragma: no cover
                 transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
                 return transaction
@@ -328,22 +328,22 @@ class ResourceLayer(object):
 
         return transaction
 
-    def _handle_separate(self, transaction, callback):
+    async def _handle_separate(self, transaction, callback):
         # Handle separate
         if not transaction.request.acknowledged:
-            self._parent._send_ack(transaction)
+            await self._parent.send_ack(transaction)
             transaction.request.acknowledged = True
-        resource = callback(request=transaction.request)
+        resource = await callback(request=transaction.request)
         return resource
 
-    def _handle_separate_advanced(self, transaction, callback):
+    async def _handle_separate_advanced(self, transaction, callback):
         # Handle separate
         if not transaction.request.acknowledged:
-            self._parent._send_ack(transaction)
+            await self._parent.send_ack(transaction)
             transaction.request.acknowledged = True
-        return callback(request=transaction.request, response=transaction.response)
+        return await callback(request=transaction.request, response=transaction.response)
 
-    def delete_resource(self, transaction, path):
+    async def delete_resource(self, transaction, path):
         """
         Render a DELETE request.
 
@@ -356,11 +356,11 @@ class ResourceLayer(object):
         method = getattr(resource, 'render_DELETE', None)
 
         try:
-            ret = method(request=transaction.request)
+            ret = await method(request=transaction.request)
         except NotImplementedError:
             try:
                 method = getattr(transaction.resource, "render_DELETE_advanced", None)
-                ret = method(request=transaction.request, response=transaction.response)
+                ret = await method(request=transaction.request, response=transaction.response)
                 if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
                         and isinstance(ret[0], bool):
                     # Advanced handler
@@ -375,7 +375,7 @@ class ResourceLayer(object):
                         and isinstance(ret[0], Resource):
                     # Advanced handler separate
                     resource, response, callback = ret
-                    ret = self._handle_separate_advanced(transaction, callback)
+                    ret = await self._handle_separate_advanced(transaction, callback)
                     if not isinstance(ret, tuple) or \
                             not (isinstance(ret[0], bool) and isinstance(ret[1], Response)):  # pragma: no cover
                         transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
@@ -397,7 +397,7 @@ class ResourceLayer(object):
             pass
         elif isinstance(ret, tuple) and len(ret) == 2:
             resource, callback = ret
-            ret = self._handle_separate(transaction, callback)
+            ret = await self._handle_separate(transaction, callback)
             if not isinstance(ret, bool):  # pragma: no cover
                 transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
                 return transaction
@@ -415,7 +415,7 @@ class ResourceLayer(object):
 
         return transaction
 
-    def get_resource(self, transaction):
+    async def get_resource(self, transaction):
         """
         Render a GET request.
 
@@ -431,11 +431,11 @@ class ResourceLayer(object):
 
         # Render_GET
         try:
-            resource = method(request=transaction.request)
+            resource = await method(request=transaction.request)
         except NotImplementedError:
             try:
                 method = getattr(transaction.resource, "render_GET_advanced", None)
-                ret = method(request=transaction.request, response=transaction.response)
+                ret = await method(request=transaction.request, response=transaction.response)
                 if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
                         and isinstance(ret[0], Resource):
                     # Advanced handler
@@ -449,7 +449,7 @@ class ResourceLayer(object):
                         and isinstance(ret[0], Resource):
                     # Advanced handler separate
                     resource, response, callback = ret
-                    ret = self._handle_separate_advanced(transaction, callback)
+                    ret = await self._handle_separate_advanced(transaction, callback)
                     if not isinstance(ret, tuple) or \
                             not (isinstance(ret[0], Resource) and isinstance(ret[1], Response)):  # pragma: no cover
                         transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
@@ -470,7 +470,7 @@ class ResourceLayer(object):
             pass
         elif isinstance(resource, tuple) and len(resource) == 2:
             resource, callback = resource
-            resource = self._handle_separate(transaction, callback)
+            resource = await self._handle_separate(transaction, callback)
             if not isinstance(resource, Resource):  # pragma: no cover
                 transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
                 return transaction
@@ -503,7 +503,7 @@ class ResourceLayer(object):
 
         return transaction
 
-    def discover(self, transaction):
+    async def discover(self, transaction):
         """
         Render a GET request to the .well-know/core link.
 

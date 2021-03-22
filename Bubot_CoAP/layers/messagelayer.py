@@ -57,7 +57,7 @@ class MessageLayer(object):
                 logger.debug("Delete transaction")
                 del self._transactions_token[k]
 
-    def receive_request(self, request):
+    async def receive_request(self, request):
         """
         Handle duplicates and store received messages.
 
@@ -81,7 +81,7 @@ class MessageLayer(object):
         else:
             request.timestamp = time.time()
             transaction = Transaction(request=request, timestamp=request.timestamp)
-            with transaction:
+            async with transaction.lock:
                 self._transactions[key_mid] = transaction
                 self._transactions_token[key_token] = transaction
         return transaction

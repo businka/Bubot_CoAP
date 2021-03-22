@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import asyncio
 import binascii
 import random
 import string
@@ -331,3 +331,22 @@ def hostportjoin(host, port=None):
     else:
         hostinfo = "%s:%d" % (host, port)
     return hostinfo
+
+
+class Timer:
+    def __init__(self, interval, callback, params):
+        self._ok = True
+        self._task = asyncio.create_task(self._job(interval, callback, params))
+
+    async def _job(self, interval, callback, params):
+        try:
+            while self._ok:
+                await asyncio.sleep(interval)
+                await callback(*params)
+        except asyncio.CancelledError:
+            return
+
+    async def cancel(self):
+        self._ok = False
+        self._task.cancel()
+        await self._task

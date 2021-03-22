@@ -11,7 +11,7 @@ class RequestLayer(object):
     def __init__(self, server):
         self._server = server
 
-    def receive_request(self, transaction):
+    async def receive_request(self, transaction):
         """
         Handle request and execute the requested method
 
@@ -22,13 +22,13 @@ class RequestLayer(object):
         """
         method = transaction.request.code
         if method == defines.Codes.GET.number:
-            transaction = self._handle_get(transaction)
+            transaction = await self._handle_get(transaction)
         elif method == defines.Codes.POST.number:
-            transaction = self._handle_post(transaction)
+            transaction = await self._handle_post(transaction)
         elif method == defines.Codes.PUT.number:
-            transaction = self._handle_put(transaction)
+            transaction = await self._handle_put(transaction)
         elif method == defines.Codes.DELETE.number:
-            transaction = self._handle_delete(transaction)
+            transaction = await self._handle_delete(transaction)
         else:
             transaction.response = None
         return transaction
@@ -43,7 +43,7 @@ class RequestLayer(object):
         """
         return request
 
-    def _handle_get(self, transaction):
+    async def _handle_get(self, transaction):
         """
         Handle GET requests
 
@@ -59,7 +59,7 @@ class RequestLayer(object):
         transaction.response.source = transaction.request.destination
         transaction.response.token = transaction.request.token
         if path == defines.DISCOVERY_URL and not wkc_resource_is_defined:
-            transaction = self._server.resourceLayer.discover(transaction)
+            transaction = await self._server.resourceLayer.discover(transaction)
         else:
             try:
                 resource = self._server.root[path]
@@ -70,10 +70,10 @@ class RequestLayer(object):
                 transaction.response.code = defines.Codes.NOT_FOUND.number
             else:
                 transaction.resource = resource
-                transaction = self._server.resourceLayer.get_resource(transaction)
+                transaction = await self._server.resourceLayer.get_resource(transaction)
         return transaction
 
-    def _handle_put(self, transaction):
+    async def _handle_put(self, transaction):
         """
         Handle PUT requests
 
@@ -96,10 +96,10 @@ class RequestLayer(object):
         else:
             transaction.resource = resource
             # Update request
-            transaction = self._server.resourceLayer.update_resource(transaction)
+            transaction = await self._server.resourceLayer.update_resource(transaction)
         return transaction
 
-    def _handle_post(self, transaction):
+    async def _handle_post(self, transaction):
         """
         Handle POST requests
 
@@ -115,10 +115,10 @@ class RequestLayer(object):
         transaction.response.token = transaction.request.token
 
         # Create request
-        transaction = self._server.resourceLayer.create_resource(path, transaction)
+        transaction = await self._server.resourceLayer.create_resource(path, transaction)
         return transaction
 
-    def _handle_delete(self, transaction):
+    async def _handle_delete(self, transaction):
         """
         Handle DELETE requests
 
@@ -142,6 +142,6 @@ class RequestLayer(object):
         else:
             # Delete
             transaction.resource = resource
-            transaction = self._server.resourceLayer.delete_resource(transaction, path)
+            transaction = await self._server.resourceLayer.delete_resource(transaction, path)
         return transaction
 
