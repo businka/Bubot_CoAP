@@ -127,12 +127,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         await client.close()
 
     async def _test_with_client_observe(self, message_list):  # pragma: no cover
-        # client = HelperClient(self.server_address)
+        client = Server()
+        await client.add_endpoint(f'coap://{self.client_address[0]}:{self.client_address[1]}')
         for message, expected in message_list:
             if message is not None:
-                await self.server.send_message(message, self.client_callback)
+                received_message = await client.send_message(message, self.client_callback)
+            await asyncio.sleep(0.1)
             if expected is not None:
-                received_message = self.queue.get()
                 if expected.type is not None:
                     self.assertEqual(received_message.type, expected.type)
                 if expected.mid is not None:
