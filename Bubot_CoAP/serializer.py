@@ -7,6 +7,7 @@ from Bubot_CoAP.messages.response import Response
 from Bubot_CoAP.messages.option import Option
 from Bubot_CoAP import defines
 from Bubot_CoAP.messages.message import Message
+import cbor2
 
 __author__ = 'Giacomo Tanganelli'
 
@@ -17,6 +18,7 @@ class Serializer(object):
     """
     Serializer class to serialize and deserialize CoAP message to/from udp streams.
     """
+
     @staticmethod
     def deserialize(datagram, source):
         """
@@ -52,7 +54,7 @@ class Serializer(object):
             message.type = message_type
             message.mid = mid
             if token_length > 0:
-                message.token = datagram[pos:pos+token_length]
+                message.token = datagram[pos:pos + token_length]
             else:
                 message.token = None
 
@@ -111,17 +113,26 @@ class Serializer(object):
                         raise AttributeError("Packet length %s, pos %s" % (length_packet, pos))
                     message.payload = ""
                     payload = values[pos:]
-                    if hasattr(message, 'payload_type') and message.payload_type in [
-                        defines.Content_types["application/octet-stream"],
-                        defines.Content_types["application/exi"],
-                        defines.Content_types["application/cbor"]
-                    ]:
-                        message.payload = payload
-                    else:
-                        try:
-                            message.payload = payload.decode("utf-8")
-                        except Exception:
-                            message.payload = payload
+
+                    try:
+                        _decoder = decoder[message.payload_type]
+                    except KeyError:
+                        _decoder = string_encode
+                    message.payload = _decoder(payload)
+                    # fmt += str(len(_data)) + "s"
+                    # values.append(_data)
+
+                    # if hasattr(message, 'payload_type') and message.payload_type in [
+                    #     defines.Content_types["application/octet-stream"],
+                    #     defines.Content_types["application/exi"],
+                    #     defines.Content_types["application/cbor"]
+                    # ]:
+                    #     message.payload = payload
+                    # else:
+                    #     try:
+                    #         message.payload = payload.decode("utf-8")
+                    #     except Exception:
+                    #         message.payload = payload
                     pos += len(payload)
 
             return message
@@ -225,8 +236,13 @@ class Serializer(object):
                 fmt += str(len(payload)) + "s"
                 values.append(payload)
             else:
-                fmt += str(len(bytes(payload, "utf-8"))) + "s"
-                values.append(bytes(payload, "utf-8"))
+                try:
+                    _encoder = encoder[message.content_type]
+                except KeyError:
+                    _encoder = string_encode
+                _data = _encoder(payload)
+                fmt += str(len(_data)) + "s"
+                values.append(_data)
 
         datagram = None
         if values[1] is None:
@@ -283,7 +299,7 @@ class Serializer(object):
             pos += 1
         elif h_nibble == 14:
             s = struct.Struct("!H")
-            value = s.unpack_from(values[pos:pos+2])[0] + 269
+            value = s.unpack_from(values[pos:pos + 2])[0] + 269
             pos += 2
         else:
             raise AttributeError("Unsupported option number nibble " + str(h_nibble))
@@ -295,7 +311,7 @@ class Serializer(object):
             pos += 1
         elif l_nibble == 14:
             s = struct.Struct("!H")
-            length = s.unpack_from(values[pos:pos+2])[0] + 269
+            length = s.unpack_from(values[pos:pos + 2])[0] + 269
             pos += 2
         else:
             raise AttributeError("Unsupported option length nibble " + str(l_nibble))
@@ -380,7 +396,7 @@ class Serializer(object):
 
         :return: a list of fixed width words based on provided parameters.
         """
-        max_int = 2 ** (word_size*num_words) - 1
+        max_int = 2 ** (word_size * num_words) - 1
         max_word_size = 2 ** word_size - 1
 
         if not 0 <= int_val <= max_int:
@@ -394,3 +410,27 @@ class Serializer(object):
         words.reverse()
 
         return words
+
+
+def cbor_loads(payload):
+    return cbor2.loads(payload)
+
+
+def cbor_dumps(payload):
+    return cbor2.dumps(payload) if payload else b''
+
+
+def string_encode(payload):
+    return bytes(payload, "utf-8")
+
+
+def string_decode(payload):
+    return cbor2.loads(payload)
+
+
+encoder = {
+    10000: cbor_dumps
+}
+decoder = {
+    10000: cbor_loads
+}

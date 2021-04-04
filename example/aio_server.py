@@ -21,7 +21,7 @@ class BasicResource(Resource):
                                             observable=True, allow_children=True)
         self.payload = "Basic Resource"
 
-    def render_GET_advanced(self, request, response):
+    async def render_GET_advanced(self, request, response):
         data = {
             "rt": [
                 "oic.r.doxm"
@@ -64,12 +64,14 @@ class BasicResource(Resource):
         return True
 
 
-def create_request():
+def create_request(sender):
     request = Request()
     request.type = NON
     # request.token = generate_random_token(2)
-    request.destination = ('192.168.1.18', 62015)
-    request.source = ('192.168.1.15', None)
+    request.destination = ('224.0.1.187', 5683)
+    # request.destination = (sender, 5683)
+    request.multicast = True
+    request.source = (sender, None)
     request.code = Code.GET
     request.uri_path = '/oic/sec/doxm'
 
@@ -85,8 +87,8 @@ def create_request():
     return request
 
 
-async def get_doxm(server):
-    request = create_request()
+async def get_doxm(server, sender):
+    request = create_request(sender)
     result = await server.send_message(request)
     pass
 
@@ -94,15 +96,69 @@ async def get_doxm(server):
 async def main():
     server = Server()
     # await server.add_endpoint('coap://[::]:40401', multicast=True, multicast_addresses=['FF02::158'])
-    await server.add_endpoint('coap://:40401', multicast=True)
+    # await server.add_endpoint('coap://192.168.1.15:40402', multicast=True)
+    # await server.add_endpoint('coap://:40405', multicast=True)
+    await server.add_endpoint('coap://172.18.59.33:40404', multicast=True)
+    await server.add_endpoint('coap://192.168.56.1:40403', multicast=True)
+    await server.add_endpoint('coap://192.168.1.15:40401', multicast=True)
+    # await asyncio.sleep(100)
     # await server.add_endpoint('coaps://:40402', multicast=True, certfile='iotivitycloud.crt',
     #                           keyfile='iotivitycloud.key')
     server.add_resource('/oic/sec/doxm', BasicResource('test', server))
-
-    await get_doxm(server)
+    # await asyncio.sleep(1)
+    print('----')
+    await get_doxm(server, '192.168.1.15')
+    # await asyncio.sleep(1)
+    print('----')
+    await get_doxm(server, '172.18.59.33')
+    # await asyncio.sleep(1)
+    print('----')
+    await get_doxm(server, '192.168.56.1')
 
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
-    loop.run_forever()
+
+    from socket import AF_INET6, AF_INET
+    import socket
+    import struct
+
+    # Bugfix for Python 3.6 for Windows ... missing IPPROTO_IPV6 constant
+    if not hasattr(socket, 'IPPROTO_IPV6'):
+        socket.IPPROTO_IPV6 = 41
+
+    multicast_address = {
+        AF_INET: ["224.0.1.187"],
+        AF_INET6: ["FF00::FD"]
+    }
+    multicast_port = 5683
+
+    addr_info = socket.getaddrinfo('', None)  # get all ip
+    for addr in addr_info:
+        family = addr[0]
+        local_address = addr[4][0]
+
+        sock = socket.socket(family, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((local_address, multicast_port))
+        if family == AF_INET:
+            for multicast_group in multicast_address[family]:
+                sock.setsockopt(
+                    socket.IPPROTO_IP,
+                    socket.IP_ADD_MEMBERSHIP,
+                    socket.inet_aton(multicast_group) + socket.inet_aton(local_address)
+                )
+        elif family == AF_INET6:
+            for multicast_group in multicast_address[family]:
+                ipv6mr_interface = struct.pack('i', addr[4][3])
+                ipv6_mreq = socket.inet_pton(socket.AF_INET6, multicast_group) + ipv6mr_interface
+                sock.setsockopt(
+                    socket.IPPROTO_IPV6,
+                    socket.IPV6_JOIN_GROUP,
+                    ipv6_mreq
+                )
+    # _transport, _protocol = await loop.create_datagram_endpoint(
+    #     lambda: protocol_factory(), sock=sock)
+
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(main())
+    # loop.run_forever()

@@ -1,6 +1,6 @@
 
-from .udp_coap import UdpCoapEndpoint
-from .udp_coaps import UdpCoapsEndpoint
+from .udp import UdpCoapEndpoint
+from .udp_tls import UdpCoapsEndpoint
 from .endpoint import Endpoint
 
 supported_scheme = {

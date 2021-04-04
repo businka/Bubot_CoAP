@@ -3,9 +3,7 @@ from Bubot_CoAP.endpoint import Endpoint, supported_scheme
 from Bubot_CoAP.utils import parse_uri2
 from Bubot_CoAP.protocol import CoapProtocol
 
-
 import socket
-from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -32,77 +30,66 @@ class EndpointLayer:
         except KeyError:
             raise TypeError(f'Unsupported scheme \'{_uri["scheme"]}\'')
         address = _uri['address']
+        result = []
 
-        multicast = kwargs.get('multicast', False)
+        # multicast = kwargs.get('multicast', False)
         if address[0] == '' or address[0] is None:  # IPv4 default
             family = socket.AF_INET
-            # addr_info = socket.getaddrinfo('', address[1], socket.AF_INET)[0]
-            # address = addr_info[4]
-            address = ('', address[1])
+            addr_info = socket.getaddrinfo('', address[1], family)
+            for addr in addr_info:
+                result += await endpoint.add(self, addr[4], **kwargs)
         elif address[0] == '::':
             family = socket.AF_INET6
-            # addr_info = socket.getaddrinfo('', address[1], socket.AF_INET6)[0]
-            # address = (f'[{addr_info[4][0]}]', addr_info[4][1])
+            addr_info = socket.getaddrinfo('', address[1], family)
+            for addr in addr_info:
+                result += await endpoint.add(self, addr[4], **kwargs)
         else:
-            addr_info = socket.getaddrinfo(address[0], address[1])[0]
-            family = addr_info[0]
-
-        result = []
-        if family == socket.AF_INET:  # IPv4
-            if multicast:
-                result.append(await self.add(endpoint.init_multicast_ip4_by_address(address, **kwargs)))
-            result.append(await self.add(endpoint.init_unicast_ip4_by_address(address, **kwargs)))
-        elif family == socket.AF_INET6:  # IPv6
-            if multicast:
-                result.append(await self.add(endpoint.init_multicast_ip6_by_address(address, **kwargs)))
-            result.append(await self.add(endpoint.init_unicast_ip6_by_address(address, **kwargs)))
-        else:
-            raise NotImplemented(f'Protocol not supported {family}')
+            result += await endpoint.add(self, address, **kwargs)
         return result
 
     async def add(self, endpoint: Endpoint):
         """
         Handle add endpoint to server
 
-        :type transaction: Transaction
+        :type endpoint: Endpoint
         :param endpoint: the new endpoint
         :rtype : Boolean
         :return:
         """
+        scheme = endpoint.scheme
+        family = endpoint.family
+        await endpoint.run(self._server, CoapProtocol)
+        host, port = endpoint.address
+        _endpoints = self._multicast_endpoints if endpoint.multicast else self._unicast_endpoints
+        if scheme not in _endpoints:
+            _endpoints[scheme] = {}
+        if family not in _endpoints[scheme]:
+            _endpoints[scheme][family] = {}
         if endpoint.multicast:
-            key = endpoint.multicast
-            if key not in self._multicast_endpoints:
-                await endpoint.run(self._server, CoapProtocol)
-                self._multicast_endpoints[key] = endpoint
-            return self._multicast_endpoints[key]
+            if host not in _endpoints[scheme][family]:
+                _endpoints[scheme][family][host] = endpoint
+                return endpoint
         else:
-            scheme = endpoint.scheme
-            family = endpoint.family
-            host, port = endpoint.address
-            if scheme not in self._unicast_endpoints:
-                self._unicast_endpoints[scheme] = {'default': endpoint}
-            if family not in self._unicast_endpoints[scheme]:
-                self._unicast_endpoints[scheme][family] = {'default': endpoint}
-            if host not in self._unicast_endpoints[scheme][family]:
-                self._unicast_endpoints[scheme][family][host] = {'default': endpoint}
-            if port not in self._unicast_endpoints[scheme][family][host]:
-                self._unicast_endpoints[scheme][family][host][port] = endpoint
-                await endpoint.run(self._server, CoapProtocol)
-            return endpoint
+            if host not in _endpoints[scheme][family]:
+                _endpoints[scheme][family][host] = {}  # 'default': endpoint}
+                if port not in self._unicast_endpoints[scheme][family][host]:
+                    self._unicast_endpoints[scheme][family][host][port] = endpoint
+                return endpoint
+        return None
 
     def find_sending_endpoint(self, message):
         source_address = message.source
         scheme = message.scheme
         dest_address = message.destination
+        family = socket.getaddrinfo(dest_address[0], None)[0][0]
         if source_address:
-            return self._unicast_endpoints[message.scheme][message.family][source_address[0]][source_address[1]]
-        else:
-            family = socket.getaddrinfo(dest_address[0], None)[0][0]
-            return self._unicast_endpoints[scheme][family]['default']
-
-    @staticmethod
-    def get_key_by_address(address):
-        return Endpoint.host_port_join(address[0], address[1])
+            _tmp = self.unicast_endpoints[scheme][family][source_address[0]]
+            if source_address[1] is None:
+                return _tmp[list(_tmp.keys())[0]]
+            return _tmp.get(source_address[1])
+        raise Exception('source address not defined')
+        # else:
+        # return self._unicast_endpoints[scheme][family]['default']
 
     def close(self):
         def _close(endpoints):
@@ -113,9 +100,9 @@ class EndpointLayer:
 
         _close(self._multicast_endpoints)
         for scheme in list(self._unicast_endpoints):
-            self._unicast_endpoints[scheme].pop('default')
+            # self._unicast_endpoints[scheme].pop('default')
             for family in list(self._unicast_endpoints[scheme]):
-                self._unicast_endpoints[scheme][family].pop('default')
+                # self._unicast_endpoints[scheme][family].pop('default')
                 for ip in list(self._unicast_endpoints[scheme][family]):
                     _close(self._unicast_endpoints[scheme][family].pop(ip))
                 del self._unicast_endpoints[scheme][family]

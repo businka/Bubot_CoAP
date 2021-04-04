@@ -11,7 +11,7 @@ class CallbackLayer:
         self._waited_answer = {}
 
     async def wait(self, request: Request, **kwargs):
-        timeout = kwargs.get('timeout', 20)
+        timeout = kwargs.get('timeout', 15)
         waiter = Waiter(request, **kwargs)
         self._waited_answer[waiter.key] = waiter
         try:
@@ -19,7 +19,10 @@ class CallbackLayer:
         except asyncio.CancelledError:
             waiter.future.set_exception(asyncio.CancelledError())
         except asyncio.TimeoutError:
-            waiter.future.set_exception(asyncio.TimeoutError())
+            if request.multicast:
+                return waiter.result
+            else:
+                raise asyncio.TimeoutError()
         finally:
             self._waited_answer.pop(waiter.key, None)
         pass
@@ -39,6 +42,7 @@ class Waiter:
     def __init__(self, request: Request, **kwargs):
         self._request = request
         self._future = asyncio.Future()
+        self._result = []
 
     @property
     def key(self):
@@ -50,4 +54,11 @@ class Waiter:
 
     @future.setter
     def future(self, value: Response):
-        self._future.set_result(value)
+        if self._request.multicast:
+            self._result.append(value)
+        else:
+            self._future.set_result(value)
+
+    @property
+    def result(self):
+        return self._result

@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import random
+from socket import AF_INET, AF_INET6
 
 from Bubot_CoAP import defines
 from Bubot_CoAP.layers.blocklayer import BlockLayer
@@ -38,7 +39,11 @@ class Server:
 
         self.stopped = asyncio.Event()
         self.stopped.clear()
-
+        self.multicast_address = {
+            AF_INET: kwargs.get('multicast_ipv4', [defines.ALL_COAP_NODES]),
+            AF_INET6: kwargs.get('multicast_ipv6', [defines.ALL_COAP_NODES_IPV6])
+        }
+        self.multicast_port = kwargs.get('multicast_port', defines.COAP_DEFAULT_PORT)
         self.to_be_stopped = []
         self.loop.create_task(self.purge())
         self.endpointLayer = EndpointLayer(self)
@@ -121,6 +126,9 @@ class Server:
             if transaction.response is not None:
                 if transaction.response.type == defines.Types["CON"]:
                     await self.start_retransmission(transaction, transaction.response)
+                if transaction.request.multicast:
+                    await asyncio.sleep(random.uniform(0, 10))
+                    transaction.response.source = (transaction.response.source[0], None)
                 self.send_datagram(transaction.response)
 
     async def send_message(self, message, no_response=False):
@@ -215,6 +223,7 @@ class Server:
         :param endpoint: the endpoint to be added
         """
         return await self.endpointLayer.add_by_netloc(url, **kwargs)
+
     #
     # def remove_endpoint(self, **kwargs):
     #     return self.endpointLayer.remove(**kwargs)
@@ -244,7 +253,8 @@ class Server:
         async with transaction.lock:
             if message.type == defines.Types['CON']:
                 future_time = random.uniform(defines.ACK_TIMEOUT, (defines.ACK_TIMEOUT * defines.ACK_RANDOM_FACTOR))
-                transaction.retransmit_thread = self.loop.create_task(self._retransmit(transaction, message, future_time, 0))
+                transaction.retransmit_thread = self.loop.create_task(
+                    self._retransmit(transaction, message, future_time, 0))
                 transaction.retransmit_stop = asyncio.Event()
                 self.to_be_stopped.append(transaction.retransmit_stop)
                 await asyncio.sleep(0.001)

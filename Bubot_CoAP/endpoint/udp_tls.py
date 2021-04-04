@@ -1,4 +1,4 @@
-from Bubot_CoAP.endpoint.udp_coap import UdpCoapEndpoint
+from Bubot_CoAP.endpoint.udp import UdpCoapEndpoint
 import ssl
 
 

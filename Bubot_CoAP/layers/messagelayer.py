@@ -100,11 +100,11 @@ class MessageLayer(object):
             host, port = response.source
         except AttributeError:
             return
-        all_coap_nodes = defines.ALL_COAP_NODES_IPV6 if socket.getaddrinfo(host, None)[0][0] == socket.AF_INET6 else defines.ALL_COAP_NODES
+        # all_coap_nodes = defines.ALL_COAP_NODES_IPV6 if socket.getaddrinfo(host, None)[0][0] == socket.AF_INET6 else defines.ALL_COAP_NODES
         key_mid = utils.str_append_hash(host, port, response.mid)
-        key_mid_multicast = utils.str_append_hash(all_coap_nodes, port, response.mid)
+        # key_mid_multicast = utils.str_append_hash(all_coap_nodes, port, response.mid)
         key_token = utils.str_append_hash(host, port, response.token)
-        key_token_multicast = utils.str_append_hash(all_coap_nodes, port, response.token)
+        key_token_multicast = response.token
         if key_mid in list(self._transactions.keys()):
             transaction = self._transactions[key_mid]
             if response.token != transaction.request.token:
@@ -112,8 +112,8 @@ class MessageLayer(object):
                 return None, False
         elif key_token in self._transactions_token:
             transaction = self._transactions_token[key_token]
-        elif key_mid_multicast in list(self._transactions.keys()):
-            transaction = self._transactions[key_mid_multicast]
+        # elif key_mid_multicast in list(self._transactions.keys()):
+        #     transaction = self._transactions[key_mid_multicast]
         elif key_token_multicast in self._transactions_token:
             transaction = self._transactions_token[key_token_multicast]
             if response.token != transaction.request.token:
@@ -213,13 +213,17 @@ class MessageLayer(object):
         if transaction.request.token is None:
             transaction.request.token = generate_random_token(8)
 
-        key_mid = utils.str_append_hash(host, port, request.mid)
-        self._transactions[key_mid] = transaction
+        if request.multicast:
+            self._transactions_token[request.token] = transaction
+            return self._transactions_token[request.token]
+        else:
+            key_mid = utils.str_append_hash(host, port, request.mid)
+            self._transactions[key_mid] = transaction
 
-        key_token = utils.str_append_hash(host, port, request.token)
-        self._transactions_token[key_token] = transaction
+            key_token = utils.str_append_hash(host, port, request.token)
+            self._transactions_token[key_token] = transaction
 
-        return self._transactions[key_mid]
+            return self._transactions[key_mid]
 
     def send_response(self, transaction):
         """

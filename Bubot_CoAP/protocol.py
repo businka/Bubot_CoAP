@@ -32,6 +32,7 @@ class CoapProtocol(DatagramProtocol):
             if isinstance(message, int):  # todo переделать в try catch
                 return self.datagram_received_bad_message(message, client_address)
             message.destination = self.endpoint.address
+            message.multicast = bool(self.endpoint.multicast)
             message.scheme = self.endpoint.scheme
             message.family = self.endpoint.family
 

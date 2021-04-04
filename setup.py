@@ -21,12 +21,12 @@ setup(
     maintainer_email="mcfreis@gmx.net",
     url="https://github.com/mcfreis/CoAPthon3",
     description='CoAPthon is a python library to the CoAP protocol.',
-    scripts=[
-        'coapclient.py',
-        'coapforwardproxy.py',
-        'coapreverseproxy.py',
-        'coapserver.py',
-        'exampleresources.py',
-    ],
+    # scripts=[
+    #     'coapclient.py',
+    #     'coapforwardproxy.py',
+    #     'coapreverseproxy.py',
+    #     'coapserver.py',
+    #     'exampleresources.py',
+    # ],
     requires=['cachetools', 'cbor2']
 )

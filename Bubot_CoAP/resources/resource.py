@@ -195,7 +195,9 @@ class Resource(object):
             self.actual_content_type = k
             self._payload[k] = v
         else:
-            self._payload = {defines.Content_types["text/plain"]: p}
+            # self._payload = {defines.Content_types["text/plain"]: p} ???
+            _default_content_type = self._content_type if self._content_type else defines.Content_types["text/plain"]
+            self._payload = {_default_content_type: p}
 
     @property
     def attributes(self):
@@ -278,7 +280,10 @@ class Resource(object):
 
         :param act: the actual required Content-Type.
         """
-        self._content_type = act
+        if isinstance(act, str):
+            self._content_type = defines.Content_types[act]
+        elif isinstance(act, int):
+            self._content_type = act
 
     @property
     def content_type(self):

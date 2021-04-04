@@ -424,10 +424,10 @@ class ResourceLayer(object):
         """
         method = getattr(transaction.resource, 'render_GET', None)
 
-        transaction.resource.actual_content_type = None
+        # transaction.resource.actual_content_type = None
         # Accept
-        if transaction.request.accept is not None:
-            transaction.resource.actual_content_type = transaction.request.accept
+        # if transaction.request.accept is not None:
+        #     transaction.resource.actual_content_type = transaction.request.accept
 
         # Render_GET
         try:
@@ -486,9 +486,10 @@ class ResourceLayer(object):
 
         try:
             transaction.response.payload = resource.payload
-            if resource.actual_content_type is not None \
-                    and resource.actual_content_type != defines.Content_types["text/plain"]:
-                transaction.response.content_type = resource.actual_content_type
+            transaction.response.content_type = resource.actual_content_type
+            # if resource.actual_content_type is not None \
+            #         and resource.actual_content_type != defines.Content_types["text/plain"]:
+            #     transaction.response.content_type = resource.actual_content_type
         except KeyError:
             transaction.response.code = defines.Codes.NOT_ACCEPTABLE.number
             return transaction.response

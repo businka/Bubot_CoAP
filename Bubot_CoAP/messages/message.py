@@ -33,6 +33,7 @@ class Message(object):
         self._rejected = None
         self._timeouted = None
         self._cancelled = None
+        self._multicast = False
         self._duplicated = None
         self._timestamp = None
         self._version = 1
@@ -58,6 +59,27 @@ class Message(object):
         if not isinstance(v, int) or v != 1:
             raise AttributeError
         self._version = v
+
+    @property
+    def multicast(self):
+        """
+        Return the CoAP version
+
+        :return: the version
+        """
+        return self._multicast
+
+    @multicast.setter
+    def multicast(self, v):
+        """
+        Sets the CoAP version
+
+        :param v: the version
+        :raise AttributeError: if value is not 1
+        """
+        if not isinstance(v, bool):
+            raise AttributeError
+        self._multicast = v
 
     @property
     def type(self):

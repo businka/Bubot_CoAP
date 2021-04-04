@@ -282,3 +282,38 @@ class Request(Message):
         """
         self.del_option_by_number(defines.OptionRegistry.PROXY_SCHEME.number)
 
+    @property
+    def query(self):
+        """
+        Get the Uri-Query of a request.
+
+        :return: the Uri-Query
+        :rtype : String
+        :return: the Uri-Query string
+        """
+        result = {}
+        for option in self.options:
+            if option.number == defines.OptionRegistry.URI_QUERY.number:
+                key, value = str(option.value).split('=')
+                if key not in value:
+                    result[key] = []
+                result[key].append(value)
+
+        return result
+
+    @query.setter
+    def query(self, value):
+        """
+        Adds a query.
+
+        :param value: the query
+        """
+        del self.uri_query
+        for key in value:
+            if not isinstance(value[key], list):
+                raise Exception('value query param must be only list')
+            for elem in value[key]:
+                option = Option()
+                option.number = defines.OptionRegistry.URI_QUERY.number
+                option.value = str(f'{key}={elem}')
+                self.add_option(option)
