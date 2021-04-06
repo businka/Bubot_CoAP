@@ -85,7 +85,7 @@ class CoapProtocol(DatagramProtocol):
             await self.server.send_ack(transaction)
         self.server.blockLayer.receive_response(transaction)
         if transaction.block_transfer:
-            self.server._send_block_request(transaction)
+            await self.server.send_block_request(transaction)
             return
         elif transaction is None:  # pragma: no cover
             self.server._send_rst(transaction)

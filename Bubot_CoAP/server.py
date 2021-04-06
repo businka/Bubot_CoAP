@@ -161,6 +161,8 @@ class Server:
         # host, port = message.destination
         # host, port = message.source
         endpoint = self.endpointLayer.find_sending_endpoint(message)
+        if not endpoint:
+            raise KeyError(f'endpoint for {message.source}')
         message.source = endpoint.address
         logger.info("send_datagram - " + str(message))
         serializer = Serializer()
@@ -240,6 +242,20 @@ class Server:
                 logger.debug("Waiting for retransmit thread to finish ...")
                 await asyncio.sleep(0.01)
                 continue
+
+    async def send_block_request(self, transaction):
+        """
+        A former request resulted in a block wise transfer. With this method, the block wise transfer
+        will be continued, including triggering of the retry mechanism.
+
+        :param transaction: The former transaction including the request which should be continued.
+        """
+        transaction = self.messageLayer.send_request(transaction.request)
+        # ... but don't forget to reset the acknowledge flag
+        transaction.request.acknowledged = False
+        self.send_datagram(transaction.request)
+        if transaction.request.type == defines.Types["CON"]:
+            await self.start_retransmission(transaction, transaction.request)
 
     async def start_retransmission(self, transaction, message):
         """

@@ -156,6 +156,7 @@ class BlockLayer(object):
         elif transaction.response.block2 is not None:
 
             num, m, size = transaction.response.block2
+            logger.error(f"response block2 num:{num} m:{m} token:{key_token}")
             if m == 1:
                 transaction.block_transfer = True
                 if key_token in self._block2_sent:

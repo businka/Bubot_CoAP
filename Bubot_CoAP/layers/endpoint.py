@@ -98,12 +98,14 @@ class EndpointLayer:
                 _ep = endpoints.pop(_key)
                 _ep.close()
 
-        _close(self._multicast_endpoints)
         for scheme in list(self._unicast_endpoints):
-            # self._unicast_endpoints[scheme].pop('default')
             for family in list(self._unicast_endpoints[scheme]):
-                # self._unicast_endpoints[scheme][family].pop('default')
                 for ip in list(self._unicast_endpoints[scheme][family]):
                     _close(self._unicast_endpoints[scheme][family].pop(ip))
                 del self._unicast_endpoints[scheme][family]
             del self._unicast_endpoints[scheme]
+
+        for scheme in list(self._multicast_endpoints):
+            for family in list(self._multicast_endpoints[scheme]):
+                _close(self._multicast_endpoints[scheme].pop(family))
+            del self._multicast_endpoints[scheme]

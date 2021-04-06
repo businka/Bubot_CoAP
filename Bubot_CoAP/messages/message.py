@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import cbor2
 
 import binascii
 import socket
@@ -15,6 +16,7 @@ class Message(object):
     """
     Class to handle the Messages.
     """
+
     def __init__(self):
         """
         Data structure that represent a CoAP message
@@ -780,7 +782,7 @@ class Message(object):
 
         token = binascii.hexlify(self._token).decode("utf-8") if self._token is not None else str(None)
 
-        msg = "From {source}, To {destination}, {type}-{mid}, {code}-{token}, ["\
+        msg = "From {source}, To {destination}, {type}-{mid}, {code}-{token}, [" \
             .format(source=self._source, destination=self._destination, type=inv_types[self._type], mid=self._mid,
                     code=defines.Codes.LIST[self._code].name, token=token)
         for opt in self._options:
@@ -823,3 +825,45 @@ class Message(object):
         msg += "Payload: " + "\n"
         msg += str(self._payload) + "\n"
         return msg
+
+    def decode_payload(self):
+        """
+        Return the payload.
+
+        :return: the payload
+        """
+        try:
+            _decoder = decoder[self.content_type]
+            return _decoder(self._payload)
+        except KeyError:
+            return self._payload
+
+    def encode_payload(self, value):
+        try:
+            _encoder = encoder[self.content_type]
+            self._payload = _encoder(value)
+        except KeyError:
+            self._payload = string_encode(value)
+
+
+def cbor_loads(payload):
+    return cbor2.loads(payload)
+
+
+def cbor_dumps(payload):
+    return cbor2.dumps(payload) if payload else b''
+
+
+def string_encode(payload):
+    return bytes(payload, "utf-8")
+
+
+encoder = {
+    0: string_encode,
+    10000: cbor_dumps
+}
+
+decoder = {
+    0: string_encode,
+    10000: cbor_loads
+}

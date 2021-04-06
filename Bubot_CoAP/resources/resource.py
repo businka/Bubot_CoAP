@@ -447,7 +447,7 @@ class Resource(object):
         :param request: the request
         :return: the resource
         """
-        raise NotImplementedError
+        raise NotImplementedError(self.__class__.__name__)
 
     def render_GET_advanced(self, request, response):
         """

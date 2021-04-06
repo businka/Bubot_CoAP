@@ -22,7 +22,7 @@ class Endpoint:
 
     @property
     def address(self):
-        return self._address
+        return (self._address[0], self._address[1])
 
     # @address.setter
     # def address(self, value):

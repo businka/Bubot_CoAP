@@ -123,11 +123,6 @@ class UdpCoapEndpoint(Endpoint):
                 socket.IP_ADD_MEMBERSHIP,
                 socket.inet_pton(socket.AF_INET, group) +
                 socket.inet_pton(socket.AF_INET, address[0])
-                # struct.pack(
-                #         "4s4s",
-                #         socket.inet_pton(socket.AF_INET, group),
-                #         socket.inet_pton(socket.AF_INET, address[0])
-                #     )
             )
         return self
 

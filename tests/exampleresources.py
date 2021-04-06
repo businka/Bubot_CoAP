@@ -117,6 +117,7 @@ class Big(Resource):
 
     def __init__(self, name="Big", coap_server=None):
         super(Big, self).__init__(name, coap_server, visible=True, observable=True, allow_children=True)
+        # self.actual_content_type = "text/plain"
         self.payload = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras sollicitudin fermentum ornare. " \
                        "Cras accumsan tellus quis dui lacinia eleifend. Proin ultrices rutrum orci vitae luctus. " \
                        "Nullam malesuada pretium elit, at aliquam odio vehicula in. Etiam nec maximus elit. " \

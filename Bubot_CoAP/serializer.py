@@ -70,7 +70,7 @@ class Serializer(object):
                     # the first 4 bits of the byte represent the option delta
                     # delta = self._reader.read(4).uint
                     num, option_length, pos = Serializer.read_option_value_len_from_byte(next_byte, pos, values)
-                    logger.debug("option value (delta): %d len: %d", num, option_length)
+                    # logger.debug("option value (delta): %d len: %d", num, option_length)
                     current_option += num
                     # read option
                     try:
@@ -113,26 +113,8 @@ class Serializer(object):
                         raise AttributeError("Packet length %s, pos %s" % (length_packet, pos))
                     message.payload = ""
                     payload = values[pos:]
+                    message.payload = payload
 
-                    try:
-                        _decoder = decoder[message.payload_type]
-                    except KeyError:
-                        _decoder = string_encode
-                    message.payload = _decoder(payload)
-                    # fmt += str(len(_data)) + "s"
-                    # values.append(_data)
-
-                    # if hasattr(message, 'payload_type') and message.payload_type in [
-                    #     defines.Content_types["application/octet-stream"],
-                    #     defines.Content_types["application/exi"],
-                    #     defines.Content_types["application/cbor"]
-                    # ]:
-                    #     message.payload = payload
-                    # else:
-                    #     try:
-                    #         message.payload = payload.decode("utf-8")
-                    #     except Exception:
-                    #         message.payload = payload
                     pos += len(payload)
 
             return message
@@ -236,11 +218,12 @@ class Serializer(object):
                 fmt += str(len(payload)) + "s"
                 values.append(payload)
             else:
-                try:
-                    _encoder = encoder[message.content_type]
-                except KeyError:
-                    _encoder = string_encode
-                _data = _encoder(payload)
+                # raise ValueError('Not bytes payload')
+                # try:
+                #     _encoder = encoder[message.content_type]
+                # except KeyError:
+                #     _encoder =
+                _data = string_encode(payload)
                 fmt += str(len(_data)) + "s"
                 values.append(_data)
 

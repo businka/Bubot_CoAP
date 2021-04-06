@@ -485,8 +485,13 @@ class ResourceLayer(object):
             transaction.response.code = defines.Codes.CONTENT.number
 
         try:
-            transaction.response.payload = resource.payload
-            transaction.response.content_type = resource.actual_content_type
+            if resource.actual_content_type is not None \
+                    and resource.actual_content_type != defines.Content_types["text/plain"]:
+                transaction.response.content_type = resource.actual_content_type
+            if isinstance(resource.payload, bytes):
+                transaction.response.payload = resource.payload
+            else:
+                transaction.response.encode_payload(resource.payload)
             # if resource.actual_content_type is not None \
             #         and resource.actual_content_type != defines.Content_types["text/plain"]:
             #     transaction.response.content_type = resource.actual_content_type
