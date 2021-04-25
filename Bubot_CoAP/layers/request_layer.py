@@ -59,7 +59,7 @@ class RequestLayer(object):
         transaction.response.source = transaction.request.destination
         transaction.response.token = transaction.request.token
         if path == defines.DISCOVERY_URL and not wkc_resource_is_defined:
-            transaction = await self._server.resourceLayer.discover(transaction)
+            transaction = await self._server.resource_layer.discover(transaction)
         else:
             try:
                 resource = self._server.root[path]
@@ -70,7 +70,7 @@ class RequestLayer(object):
                 transaction.response.code = defines.Codes.NOT_FOUND.number
             else:
                 transaction.resource = resource
-                transaction = await self._server.resourceLayer.get_resource(transaction)
+                transaction = await self._server.resource_layer.get_resource(transaction)
         return transaction
 
     async def _handle_put(self, transaction):
@@ -96,7 +96,7 @@ class RequestLayer(object):
         else:
             transaction.resource = resource
             # Update request
-            transaction = await self._server.resourceLayer.update_resource(transaction)
+            transaction = await self._server.resource_layer.update_resource(transaction)
         return transaction
 
     async def _handle_post(self, transaction):
@@ -115,7 +115,7 @@ class RequestLayer(object):
         transaction.response.token = transaction.request.token
 
         # Create request
-        transaction = await self._server.resourceLayer.create_resource(path, transaction)
+        transaction = await self._server.resource_layer.create_resource(path, transaction)
         return transaction
 
     async def _handle_delete(self, transaction):
@@ -142,6 +142,6 @@ class RequestLayer(object):
         else:
             # Delete
             transaction.resource = resource
-            transaction = await self._server.resourceLayer.delete_resource(transaction, path)
+            transaction = await self._server.resource_layer.delete_resource(transaction, path)
         return transaction
 

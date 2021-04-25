@@ -59,7 +59,7 @@ class ForwardLayer(object):
         transaction.response.destination = transaction.request.source
         transaction.response.token = transaction.request.token
         if path == defines.DISCOVERY_URL and not wkc_resource_is_defined:
-            transaction = self._server.resourceLayer.discover(transaction)
+            transaction = self._server.resource_layer.discover(transaction)
         else:
             new = False
             if transaction.request.code == defines.Codes.POST.number:

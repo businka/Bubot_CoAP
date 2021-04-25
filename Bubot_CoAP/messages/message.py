@@ -8,8 +8,9 @@ from Bubot_CoAP import defines
 from Bubot_CoAP import utils
 from Bubot_CoAP.messages.option import Option
 from Bubot_CoAP.messages.options import Options
+from Bubot_CoAP.utils import generate_random_token
 
-__author__ = 'Giacomo Tanganelli'
+# __author__ = 'Giacomo Tanganelli'
 
 
 class Message(object):
@@ -23,7 +24,6 @@ class Message(object):
         """
         self._type = None
         self._mid = None
-        self._scheme = None
         self._token = None
         self._family = None
         self._options = []
@@ -40,6 +40,9 @@ class Message(object):
         self._timestamp = None
         self._version = 1
         self._opt = Options()
+        self._scheme = None
+        self.ep_source = None
+        self.ep_destination = None
 
     @property
     def version(self):
@@ -123,7 +126,7 @@ class Message(object):
         :param value: the MID
         :raise AttributeError: if value is not int or cannot be represented on 16 bits.
         """
-        if not isinstance(value, int) or value > 65536:
+        if value is not None and (not isinstance(value, int) or value > 65536):
             raise AttributeError
         self._mid = value
 
@@ -153,7 +156,7 @@ class Message(object):
         :raise AttributeError: if value is longer than 256
         """
         if value is None:
-            self._token = value
+            self._token = generate_random_token(8)
             return
         if not isinstance(value, bytes):
             value = bytes(value)

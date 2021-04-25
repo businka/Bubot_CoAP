@@ -4,18 +4,18 @@ import random
 from socket import AF_INET, AF_INET6
 
 from Bubot_CoAP import defines
-from Bubot_CoAP.layers.blocklayer import BlockLayer
-from Bubot_CoAP.layers.messagelayer import MessageLayer
-from Bubot_CoAP.layers.observelayer import ObserveLayer
-from Bubot_CoAP.layers.requestlayer import RequestLayer
-from Bubot_CoAP.layers.resourcelayer import ResourceLayer
-from Bubot_CoAP.layers.callback import CallbackLayer
+from Bubot_CoAP.layers.block_layer import BlockLayer
+from Bubot_CoAP.layers.message_layer import MessageLayer
+from Bubot_CoAP.layers.observe_layer import ObserveLayer
+from Bubot_CoAP.layers.request_layer import RequestLayer
+from Bubot_CoAP.layers.resource_layer import ResourceLayer
+from Bubot_CoAP.layers.callback_layer import CallbackLayer
 from Bubot_CoAP.messages.message import Message
 from Bubot_CoAP.messages.request import Request
 from Bubot_CoAP.resources.resource import Resource
 from Bubot_CoAP.serializer import Serializer
 from Bubot_CoAP.utils import Tree, Timer
-from Bubot_CoAP.layers.endpoint import EndpointLayer
+from Bubot_CoAP.layers.endpoint_layer import EndpointLayer
 
 __author__ = 'Giacomo Tanganelli'
 
@@ -34,7 +34,9 @@ class Server:
         :param starting_mid: used for testing purposes
         :param cb_ignore_listen_exception: Callback function to handle exception raised during the socket listen operation
         """
-
+        self.max_retransmit = kwargs.get('max_retransmit', defines.MAX_RETRANSMIT)
+        self.ask_timeout = kwargs.get('ask_timeout', defines.ACK_TIMEOUT)
+        self.exchange_lifetime = kwargs.get('exchange_lifetime', defines.EXCHANGE_LIFETIME)
         self.loop = kwargs.get('loop', asyncio.get_event_loop())
 
         self.stopped = asyncio.Event()
@@ -46,13 +48,13 @@ class Server:
         self.multicast_port = kwargs.get('multicast_port', defines.COAP_DEFAULT_PORT)
         self.to_be_stopped = []
         self.loop.create_task(self.purge())
-        self.endpointLayer = EndpointLayer(self)
-        self.messageLayer = MessageLayer(starting_mid)
-        self.blockLayer = BlockLayer()
-        self.observeLayer = ObserveLayer()
-        self.requestLayer = RequestLayer(self)
-        self.resourceLayer = ResourceLayer(self)
-        self.callbackLayer = CallbackLayer()
+        self.endpoint_layer = EndpointLayer(self)
+        self.message_layer = MessageLayer(starting_mid)
+        self.block_layer = BlockLayer()
+        self.observe_layer = ObserveLayer()
+        self.request_layer = RequestLayer(self)
+        self.resource_layer = ResourceLayer(self)
+        self.callback_layer = CallbackLayer()
         # Resource directory
         root = Resource('root', self, visible=False, observable=False, allow_children=False)
         root.path = '/'
@@ -71,7 +73,7 @@ class Server:
                 await asyncio.wait_for(self.stopped.wait(), defines.EXCHANGE_LIFETIME)
             except asyncio.TimeoutError:
                 pass
-            self.messageLayer.purge()
+            self.message_layer.purge()
 
     async def close(self):
         """
@@ -83,7 +85,7 @@ class Server:
         for event in self.to_be_stopped:
             event.set()
         await asyncio.sleep(0.001)
-        self.endpointLayer.close()
+        self.endpoint_layer.close()
 
     async def receive_request(self, transaction):
         """
@@ -96,17 +98,17 @@ class Server:
 
             transaction.separate_timer = await self._start_separate_timer(transaction)
 
-            self.blockLayer.receive_request(transaction)
+            self.block_layer.receive_request(transaction)
 
             if transaction.block_transfer:
                 await self._stop_separate_timer(transaction.separate_timer)
-                self.messageLayer.send_response(transaction)
+                self.message_layer.send_response(transaction)
                 self.send_datagram(transaction.response)
                 return
 
-            await self.observeLayer.receive_request(transaction)
+            await self.observe_layer.receive_request(transaction)
 
-            await self.requestLayer.receive_request(transaction)
+            await self.request_layer.receive_request(transaction)
 
             if transaction.resource is not None and transaction.resource.changed:
                 await self.notify(transaction.resource)
@@ -115,13 +117,13 @@ class Server:
                 await self.notify(transaction.resource)
                 transaction.resource.deleted = False
 
-            self.observeLayer.send_response(transaction)
+            self.observe_layer.send_response(transaction)
 
-            self.blockLayer.send_response(transaction)
+            self.block_layer.send_response(transaction)
 
             await self._stop_separate_timer(transaction.separate_timer)
 
-            self.messageLayer.send_response(transaction)
+            self.message_layer.send_response(transaction)
 
             if transaction.response is not None:
                 if transaction.response.type == defines.Types["CON"]:
@@ -133,21 +135,21 @@ class Server:
 
     async def send_message(self, message, no_response=False):
         if isinstance(message, Request):
-            request = self.requestLayer.send_request(message)
-            request = self.observeLayer.send_request(request)
-            request = self.blockLayer.send_request(request)
+            request = self.request_layer.send_request(message)
+            request = self.observe_layer.send_request(request)
+            request = self.block_layer.send_request(request)
             if no_response:
                 # don't add the send message to the message layer transactions
                 self.send_datagram(request)
                 return
-            transaction = self.messageLayer.send_request(request)
+            transaction = self.message_layer.send_request(request)
             self.send_datagram(transaction.request)
             if transaction.request.type == defines.Types["CON"]:
                 await self.start_retransmission(transaction, transaction.request)
-            return await self.callbackLayer.wait(request)
+            return await self.callback_layer.wait(request)
         elif isinstance(message, Message):
-            message = self.observeLayer.send_empty(message)
-            message = self.messageLayer.send_empty(None, None, message)
+            message = self.observe_layer.send_empty(message)
+            message = self.message_layer.send_empty(None, None, message)
             self.send_datagram(message)
 
     def send_datagram(self, message):
@@ -160,7 +162,7 @@ class Server:
         # if not self.stopped.isSet():
         # host, port = message.destination
         # host, port = message.source
-        endpoint = self.endpointLayer.find_sending_endpoint(message)
+        endpoint = self.endpoint_layer.find_sending_endpoint(message)
         if not endpoint:
             raise KeyError(f'endpoint for {message.source}')
         message.source = endpoint.address
@@ -224,11 +226,11 @@ class Server:
 
         :param endpoint: the endpoint to be added
         """
-        return await self.endpointLayer.add_by_netloc(url, **kwargs)
+        return await self.endpoint_layer.add_by_netloc(url, **kwargs)
 
     #
     # def remove_endpoint(self, **kwargs):
-    #     return self.endpointLayer.remove(**kwargs)
+    #     return self.endpoint_layer.remove(**kwargs)
     #     pass
 
     @staticmethod
@@ -250,7 +252,7 @@ class Server:
 
         :param transaction: The former transaction including the request which should be continued.
         """
-        transaction = self.messageLayer.send_request(transaction.request)
+        transaction = self.message_layer.send_request(transaction.request)
         # ... but don't forget to reset the acknowledge flag
         transaction.request.acknowledged = False
         self.send_datagram(transaction.request)
@@ -306,7 +308,7 @@ class Server:
                 logger.warning("Give up on message {message}".format(message=message.line_print))
                 message.timeouted = True
                 if message.observe is not None:
-                    self.observeLayer.remove_subscriber(message)
+                    self.observe_layer.remove_subscriber(message)
 
                 # Inform the user, that nothing was received
                 # self._callback(None)
@@ -352,7 +354,7 @@ class Server:
         ack.type = defines.Types['ACK']
         async with transaction.lock:
             if not transaction.request.acknowledged and transaction.request.type == defines.Types["CON"]:
-                ack = self.messageLayer.send_empty(transaction, transaction.request, ack)
+                ack = self.message_layer.send_empty(transaction, transaction.request, ack)
                 if ack.type is not None and ack.mid is not None:
                     self.send_datagram(ack)
 
@@ -362,15 +364,15 @@ class Server:
 
         :param resource: the resource
         """
-        observers = self.observeLayer.notify(resource)
+        observers = self.observe_layer.notify(resource)
         logger.debug("Notify")
         for transaction in observers:
             with transaction:
                 transaction.response = None
-                transaction = self.requestLayer.receive_request(transaction)
-                transaction = self.observeLayer.send_response(transaction)
-                transaction = self.blockLayer.send_response(transaction)
-                transaction = self.messageLayer.send_response(transaction)
+                transaction = self.request_layer.receive_request(transaction)
+                transaction = self.observe_layer.send_response(transaction)
+                transaction = self.block_layer.send_response(transaction)
+                transaction = self.message_layer.send_response(transaction)
                 if transaction.response is not None:
                     if transaction.response.type == defines.Types["CON"]:
                         await self.start_retransmission(transaction, transaction.response)

@@ -32,6 +32,10 @@ class MessageLayer(object):
         else:
             self._current_mid = random.randint(1, 1000)
 
+    @staticmethod
+    def fetch_token():
+        return generate_random_token(8)
+
     def fetch_mid(self):
         """
         Gets the next valid MID.
@@ -71,19 +75,26 @@ class MessageLayer(object):
             host, port = request.source
         except AttributeError:
             return
-        key_mid = utils.str_append_hash(host, port, request.mid)
-        key_token = utils.str_append_hash(host, port, request.token)
-
-        if key_mid in list(self._transactions.keys()):
-            # Duplicated
-            self._transactions[key_mid].request.duplicated = True
-            transaction = self._transactions[key_mid]
+        if request.multicast:
+            key_mid = request.mid
+            key_token = request.token  # skip duplicated from net interfaces
+            if key_token in list(self._transactions_token.keys()):
+                # Duplicated multicast request
+                self._transactions_token[key_token].request.duplicated = True
+                return self._transactions_token[key_token]
         else:
-            request.timestamp = time.time()
-            transaction = Transaction(request=request, timestamp=request.timestamp)
-            async with transaction.lock:
-                self._transactions[key_mid] = transaction
-                self._transactions_token[key_token] = transaction
+            key_mid = utils.str_append_hash(host, port, request.mid)
+            key_token = utils.str_append_hash(host, port, request.token)
+
+            if key_mid in list(self._transactions.keys()):
+                # Duplicated
+                self._transactions[key_mid].request.duplicated = True
+                return self._transactions[key_mid]
+        request.timestamp = time.time()
+        transaction = Transaction(request=request, timestamp=request.timestamp)
+        async with transaction.lock:
+            self._transactions[key_mid] = transaction
+            self._transactions_token[key_token] = transaction
         return transaction
 
     def receive_response(self, response):
@@ -104,7 +115,7 @@ class MessageLayer(object):
         key_mid = utils.str_append_hash(host, port, response.mid)
         # key_mid_multicast = utils.str_append_hash(all_coap_nodes, port, response.mid)
         key_token = utils.str_append_hash(host, port, response.token)
-        key_token_multicast = response.token
+        key_token_multicast = utils.str_append_hash(response.destination[0], response.destination[1], response.token)
         if key_mid in list(self._transactions.keys()):
             transaction = self._transactions[key_mid]
             if response.token != transaction.request.token:
@@ -211,11 +222,12 @@ class MessageLayer(object):
             transaction.request.mid = self.fetch_mid()
 
         if transaction.request.token is None:
-            transaction.request.token = generate_random_token(8)
+            transaction.request.token = self.fetch_token()
 
         if request.multicast:
-            self._transactions_token[request.token] = transaction
-            return self._transactions_token[request.token]
+            key_token = utils.str_append_hash(request.source[0], request.source[1], request.token)
+            self._transactions_token[key_token] = transaction
+            return self._transactions_token[key_token]
         else:
             key_mid = utils.str_append_hash(host, port, request.mid)
             self._transactions[key_mid] = transaction

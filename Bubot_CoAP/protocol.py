@@ -58,13 +58,13 @@ class CoapProtocol(DatagramProtocol):
         rst.destination = client_address
         rst.type = defines.Types["RST"]
         rst.code = message
-        rst.mid = self.server.messageLayer.fetch_mid()
+        rst.mid = self.server.message_layer.fetch_mid()
         rst.source = self.endpoint.address
         self.server.send_datagram(rst)
         return
 
     async def datagram_received_request(self, message):
-        transaction = await self.server.messageLayer.receive_request(message)
+        transaction = await self.server.message_layer.receive_request(message)
         if transaction.request.duplicated and transaction.completed:
             logger.debug("message duplicated, transaction completed")
             if transaction.response is not None:
@@ -77,32 +77,32 @@ class CoapProtocol(DatagramProtocol):
         await self.server.receive_request(transaction)
 
     async def datagram_received_response(self, message):
-        transaction, send_ack = self.server.messageLayer.receive_response(message)
+        transaction, send_ack = self.server.message_layer.receive_response(message)
         if transaction is None:  # pragma: no cover
             return
         await self.server.wait_for_retransmit_thread(transaction)
         if send_ack:
             await self.server.send_ack(transaction)
-        self.server.blockLayer.receive_response(transaction)
+        self.server.block_layer.receive_response(transaction)
         if transaction.block_transfer:
             await self.server.send_block_request(transaction)
             return
         elif transaction is None:  # pragma: no cover
             self.server._send_rst(transaction)
             return
-        self.server.observeLayer.receive_response(transaction)
+        self.server.observe_layer.receive_response(transaction)
         if transaction.notification:  # pragma: no cover
             ack = Message()
             ack.type = defines.Types['ACK']
-            ack = self.server.messageLayer.send_empty(transaction, transaction.response, ack)
+            ack = self.server.message_layer.send_empty(transaction, transaction.response, ack)
             self.server.send_datagram(ack)
-            self.server.callbackLayer.set_result(transaction.response)
+            self.server.callback_layer.set_result(transaction.response)
         else:
-            self.server.callbackLayer.set_result(transaction.response)
+            self.server.callback_layer.set_result(transaction.response)
 
     async def datagram_received_message(self, message):
-        transaction = self.server.messageLayer.receive_empty(message)
+        transaction = self.server.message_layer.receive_empty(message)
         if transaction is not None:
             async with transaction.lock:
-                self.server.blockLayer.receive_empty(message, transaction)
-                self.server.observeLayer.receive_empty(message, transaction)
+                self.server.block_layer.receive_empty(message, transaction)
+                self.server.observe_layer.receive_empty(message, transaction)
