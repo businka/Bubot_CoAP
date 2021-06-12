@@ -71,13 +71,13 @@ class UdpCoapEndpoint(Endpoint):
             family = socket.getaddrinfo(address[0], address[1])[0][0]
         multicast = kwargs.get('multicast', False)
         if family == socket.AF_INET:  # IPv4
+            result.append(await endpoint_layer.add(cls.init_unicast_ip4_by_address(address, **kwargs)))
             if multicast:
                 result.append(await endpoint_layer.add(cls.init_multicast_ip4_by_address(address, **kwargs)))
-            result.append(await endpoint_layer.add(cls.init_unicast_ip4_by_address(address, **kwargs)))
         elif family == socket.AF_INET6:  # IPv6
+            result.append(await endpoint_layer.add(cls.init_unicast_ip6_by_address(address, **kwargs)))
             if multicast:
                 result.append(await endpoint_layer.add(cls.init_multicast_ip6_by_address(address, **kwargs)))
-            result.append(await endpoint_layer.add(cls.init_unicast_ip6_by_address(address, **kwargs)))
         else:
             raise NotImplemented(f'Protocol not supported {family}')
         return result

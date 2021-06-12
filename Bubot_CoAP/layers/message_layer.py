@@ -9,6 +9,7 @@ from Bubot_CoAP import defines
 from Bubot_CoAP.messages.request import Request
 from Bubot_CoAP.transaction import Transaction
 from Bubot_CoAP.utils import generate_random_token
+# import asyncio
 
 __author__ = 'Giacomo Tanganelli'
 
@@ -19,12 +20,15 @@ class MessageLayer(object):
     """
     Handles matching between messages (Message ID) and request/response (Token)
     """
-    def __init__(self, starting_mid):
+
+    def __init__(self, server, starting_mid):
         """
         Set the layer internal structure.
 
         :param starting_mid: the first mid used to send messages.
         """
+        # self.lock = asyncio.Lock()
+        self.server = server
         self._transactions = {}
         self._transactions_token = {}
         if starting_mid is not None:
@@ -60,6 +64,7 @@ class MessageLayer(object):
             if transaction.timestamp + timeout_time < now:
                 logger.debug("Delete transaction")
                 del self._transactions_token[k]
+                self.server.block_layer.purge(k)
 
     async def receive_request(self, request):
         """
@@ -91,10 +96,23 @@ class MessageLayer(object):
                 self._transactions[key_mid].request.duplicated = True
                 return self._transactions[key_mid]
         request.timestamp = time.time()
+
         transaction = Transaction(request=request, timestamp=request.timestamp)
-        async with transaction.lock:
-            self._transactions[key_mid] = transaction
-            self._transactions_token[key_token] = transaction
+        # async with transaction.lock:
+        #     self._transactions[key_mid] = transaction
+        #     self._transactions_token[key_token] = transaction
+        ## async with self.lock:
+        if key_token in self._transactions_token \
+                and self._transactions_token[key_token].response is not None:  # вычитываем результат
+            transaction = self._transactions_token[key_token]
+            async with transaction.lock:
+                self._transactions_token[key_token].request = request
+                self._transactions[key_mid] = transaction
+        else:
+            transaction = Transaction(request=request, timestamp=request.timestamp)
+            async with transaction.lock:
+                self._transactions_token[key_token] = transaction
+                self._transactions[key_mid] = transaction
         return transaction
 
     def receive_response(self, response):
@@ -158,7 +176,8 @@ class MessageLayer(object):
             host, port = message.source
         except AttributeError:
             return
-        all_coap_nodes = defines.ALL_COAP_NODES_IPV6 if socket.getaddrinfo(host, None)[0][0] == socket.AF_INET6 else defines.ALL_COAP_NODES
+        all_coap_nodes = defines.ALL_COAP_NODES_IPV6 if socket.getaddrinfo(host, None)[0][
+                                                            0] == socket.AF_INET6 else defines.ALL_COAP_NODES
         key_mid = utils.str_append_hash(host, port, message.mid)
         key_mid_multicast = utils.str_append_hash(all_coap_nodes, port, message.mid)
         key_token = utils.str_append_hash(host, port, message.token)
@@ -186,7 +205,7 @@ class MessageLayer(object):
             elif not transaction.response.acknowledged:
                 transaction.response.rejected = True
         elif message.type == defines.Types["CON"]:
-            #implicit ACK (might have been lost)
+            # implicit ACK (might have been lost)
             logger.debug("Implicit ACK on received CON for waiting transaction")
             transaction.request.acknowledged = True
         else:

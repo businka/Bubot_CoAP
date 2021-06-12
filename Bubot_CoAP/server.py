@@ -49,7 +49,7 @@ class Server:
         self.to_be_stopped = []
         self.loop.create_task(self.purge())
         self.endpoint_layer = EndpointLayer(self)
-        self.message_layer = MessageLayer(starting_mid)
+        self.message_layer = MessageLayer(self, starting_mid)
         self.block_layer = BlockLayer()
         self.observe_layer = ObserveLayer()
         self.request_layer = RequestLayer(self)
@@ -107,8 +107,8 @@ class Server:
                 return
 
             await self.observe_layer.receive_request(transaction)
-
-            await self.request_layer.receive_request(transaction)
+            if transaction.resource is None:
+                await self.request_layer.receive_request(transaction)
 
             if transaction.resource is not None and transaction.resource.changed:
                 await self.notify(transaction.resource)

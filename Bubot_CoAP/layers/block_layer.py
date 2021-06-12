@@ -34,6 +34,7 @@ class BlockLayer(object):
     """
     Handle the Blockwise options. Hides all the exchange to both servers and clients.
     """
+
     def __init__(self):
         self._block1_sent = {}  # type: dict[hash, BlockItem]
         self._block2_sent = {}  # type: dict[hash, BlockItem]
@@ -57,6 +58,8 @@ class BlockLayer(object):
                 self._block2_receive[key_token].num = num
                 self._block2_receive[key_token].size = size
                 self._block2_receive[key_token].m = m
+                if self._block2_receive[key_token].payload:
+                    transaction.completed = True
                 del transaction.request.block2
             else:
                 # early negotiation
@@ -143,7 +146,7 @@ class BlockLayer(object):
             request = transaction.request
             del request.mid
             del request.block1
-            request.payload = item.payload[item.byte: item.byte+item.size]
+            request.payload = item.payload[item.byte: item.byte + item.size]
             item.num += 1
             item.byte += item.size
             if len(item.payload) <= item.byte:
@@ -156,7 +159,7 @@ class BlockLayer(object):
         elif transaction.response.block2 is not None:
 
             num, m, size = transaction.response.block2
-            logger.error(f"response block2 num:{num} m:{m} token:{key_token}")
+            logger.debug(f"response block2 num:{num} m:{m} token:{key_token}")
             if m == 1:
                 transaction.block_transfer = True
                 if key_token in self._block2_sent:
@@ -185,7 +188,8 @@ class BlockLayer(object):
             else:
                 transaction.block_transfer = False
                 if key_token in self._block2_sent:
-                    if self._block2_sent[key_token].content_type != transaction.response.content_type:  # pragma: no cover
+                    if self._block2_sent[
+                        key_token].content_type != transaction.response.content_type:  # pragma: no cover
                         logger.error("Content-type Error")
                         return self.error(transaction, defines.Codes.UNSUPPORTED_CONTENT_FORMAT.number)
                     transaction.response.payload = self._block2_sent[key_token].payload + transaction.response.payload
@@ -218,41 +222,47 @@ class BlockLayer(object):
         """
         host, port = transaction.request.source
         key_token = utils.str_append_hash(host, port, transaction.request.token)
-        if (key_token in self._block2_receive and transaction.response.payload is not None) or \
-                (transaction.response.payload is not None and len(transaction.response.payload) > defines.MAX_PAYLOAD):
+        if (key_token in self._block2_receive and self._block2_receive[key_token].payload is not None) or (
+                transaction.response is not None and transaction.response.payload is not None and (
+                key_token in self._block2_receive or len(transaction.response.payload) > defines.MAX_PAYLOAD)):
             if key_token in self._block2_receive:
-
                 byte = self._block2_receive[key_token].byte
                 size = self._block2_receive[key_token].size
                 num = self._block2_receive[key_token].num
-
+                if self._block2_receive[key_token].payload is None and transaction.response.payload is not None:
+                    self._block2_receive[key_token].payload = transaction.response.payload
+                    self._block2_receive[key_token].content_type = transaction.response.content_type
             else:
                 byte = 0
                 num = 0
                 size = defines.MAX_PAYLOAD
                 m = 1
+                self._block2_receive[key_token] = BlockItem(byte, num, m, size, transaction.response.payload,
+                                                            transaction.response.content_type)
 
-                self._block2_receive[key_token] = BlockItem(byte, num, m, size)
-
-                
             # correct m
-            m = 0 if ((num * size) + size) > len(transaction.response.payload) else 1
+            m = 0 if ((num * size) + size) > len(self._block2_receive[key_token].payload) else 1
             # add size2 if requested or if payload is bigger than one datagram
-            del transaction.response.size2
+            if transaction.response is not None:
+                del transaction.response.size2
             if (transaction.request.size2 is not None and transaction.request.size2 == 0) or \
-               (transaction.response.payload is not None and len(transaction.response.payload) > defines.MAX_PAYLOAD):
-                transaction.response.size2 = len(transaction.response.payload)
+                    (self._block2_receive[key_token].payload is not None and len(
+                        self._block2_receive[key_token].payload) > defines.MAX_PAYLOAD):
+                transaction.response.size2 = len(self._block2_receive[key_token].payload)
 
-            transaction.response.payload = transaction.response.payload[byte:byte + size]
+            transaction.response.payload = self._block2_receive[key_token].payload[byte:byte + size]
             del transaction.response.block2
             transaction.response.block2 = (num, m, size)
 
             self._block2_receive[key_token].byte += size
             self._block2_receive[key_token].num += 1
-            if m == 0:
-                del self._block2_receive[key_token]
+            # if m == 0:
+            #     del self._block2_receive[key_token]
 
         return transaction
+
+    def purge(self, key_token):
+        del self._block2_receive[key_token]
 
     def send_request(self, request):
         """
@@ -323,4 +333,3 @@ class BlockLayer(object):
         transaction.response.token = transaction.request.token
         transaction.response.code = code
         return transaction
-

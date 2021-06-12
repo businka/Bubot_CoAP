@@ -24,6 +24,25 @@ class EndpointLayer:
         return self._unicast_endpoints
 
     async def add_by_netloc(self, uri: str, **kwargs):
+        async def add_all_address(_family, _result):
+            addr_info = socket.getaddrinfo('', address[1], _family)
+            _new_port = None
+            for addr in addr_info:
+                if _new_port:
+                    if _family == socket.AF_INET:
+                        _address = (addr[4][0], _new_port)
+                    elif _family == socket.AF_INET6:
+                        _address = (addr[4][0], _new_port, addr[4][2], addr[4][3])
+                    else:
+                        raise NotImplemented()
+                else:
+                    _address = addr[4]
+                res = await endpoint.add(self, _address, **kwargs)
+                if not addr[1] and not _new_port:  # if port not defined. set the same
+                    _new_port = res[0].address[1]
+
+                _result += res
+
         _uri = parse_uri2(uri)
         try:
             endpoint = supported_scheme[_uri['scheme']]
@@ -34,15 +53,9 @@ class EndpointLayer:
 
         # multicast = kwargs.get('multicast', False)
         if address[0] == '' or address[0] is None:  # IPv4 default
-            family = socket.AF_INET
-            addr_info = socket.getaddrinfo('', address[1], family)
-            for addr in addr_info:
-                result += await endpoint.add(self, addr[4], **kwargs)
+            await add_all_address(socket.AF_INET, result)
         elif address[0] == '::':
-            family = socket.AF_INET6
-            addr_info = socket.getaddrinfo('', address[1], family)
-            for addr in addr_info:
-                result += await endpoint.add(self, addr[4], **kwargs)
+            await add_all_address(socket.AF_INET6, result)
         else:
             result += await endpoint.add(self, address, **kwargs)
         return result

@@ -37,6 +37,7 @@ class Message(object):
         self._cancelled = None
         self._multicast = False
         self._duplicated = None
+        self._completed = False
         self._timestamp = None
         self._version = 1
         self._opt = Options()
@@ -85,6 +86,27 @@ class Message(object):
         if not isinstance(v, bool):
             raise AttributeError
         self._multicast = v
+
+    @property
+    def completed(self):
+        """
+        Return response status
+
+        :return: the version
+        """
+        return self._multicast
+
+    @completed.setter
+    def completed(self, v):
+        """
+        Sets response status
+
+        :param v: the version
+        :raise AttributeError: if value is not 1
+        """
+        if not isinstance(v, bool):
+            raise AttributeError
+        self._completed = v
 
     @property
     def type(self):
@@ -863,10 +885,12 @@ def string_encode(payload):
 
 encoder = {
     0: string_encode,
+    60: cbor_dumps,
     10000: cbor_dumps
 }
 
 decoder = {
     0: string_encode,
+    60: cbor_loads,
     10000: cbor_loads
 }
