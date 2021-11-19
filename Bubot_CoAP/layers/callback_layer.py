@@ -4,14 +4,18 @@ from Bubot_CoAP.messages.request import Request
 from Bubot_CoAP.messages.response import Response
 
 logger = logging.getLogger(__name__)
+from Bubot_CoAP.defines import MULTICAST_TIMEOUT
 
 
 class CallbackLayer:
-    def __init__(self):
+    def __init__(self, server):
+        self.server = server
         self._waited_answer = {}
 
     async def wait(self, request: Request, **kwargs):
-        timeout = kwargs.get('timeout', 15)
+        timeout = kwargs.get('timeout')
+        if not timeout:
+            timeout = MULTICAST_TIMEOUT
         waiter = Waiter(request, **kwargs)
         self._waited_answer[waiter.key] = waiter
         try:

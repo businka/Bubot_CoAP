@@ -29,8 +29,11 @@ class CoapProtocol(DatagramProtocol):
             client_address = (client_address[0], client_address[1])
             serializer = Serializer()
             message = serializer.deserialize(data, client_address)
+
             if isinstance(message, int):  # todo переделать в try catch
+                # if data[0] == b'\x16':  # client hello
                 return self.datagram_received_bad_message(message, client_address)
+
             message.destination = self.endpoint.address
             message.multicast = bool(self.endpoint.multicast)
             message.scheme = self.endpoint.scheme

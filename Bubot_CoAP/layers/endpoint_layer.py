@@ -1,7 +1,7 @@
 import logging
 from Bubot_CoAP.endpoint import Endpoint, supported_scheme
 from Bubot_CoAP.utils import parse_uri2
-from Bubot_CoAP.protocol import CoapProtocol
+from Bubot_CoAP.coap_protocol import CoapProtocol
 
 import socket
 
@@ -24,6 +24,12 @@ class EndpointLayer:
         return self._unicast_endpoints
 
     async def add_by_netloc(self, uri: str, **kwargs):
+        """
+
+        :param uri:
+        :param kwargs:
+        :return:
+        """
         async def add_all_address(_family, _result):
             addr_info = socket.getaddrinfo('', address[1], _family)
             _new_port = None
@@ -71,7 +77,7 @@ class EndpointLayer:
         """
         scheme = endpoint.scheme
         family = endpoint.family
-        await endpoint.run(self._server, CoapProtocol)
+        await endpoint.listen(self._server, CoapProtocol)
         host, port = endpoint.address
         _endpoints = self._multicast_endpoints if endpoint.multicast else self._unicast_endpoints
         if scheme not in _endpoints:
@@ -89,6 +95,20 @@ class EndpointLayer:
                     self._unicast_endpoints[scheme][family][host][port] = endpoint
                 return endpoint
         return None
+
+    def find_endpoint(self, *args, scheme=None, family=None, address=None):
+        if scheme is None:
+           scheme = self.get_first_elem(self.unicast_endpoints)
+        if family is None:
+            family = self.get_first_elem(self.unicast_endpoints[scheme])
+        if address is None:
+            address = self.get_first_elem(self.unicast_endpoints[scheme][family])
+        port = self.get_first_elem(self.unicast_endpoints[scheme][family][address])
+        return self.unicast_endpoints[scheme][family][address][port]
+
+    @staticmethod
+    def get_first_elem(obj):
+        return list(obj.keys())[0]
 
     def find_sending_endpoint(self, message):
         source_address = message.source

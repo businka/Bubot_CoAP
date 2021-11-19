@@ -17,6 +17,8 @@ from Bubot_CoAP.serializer import Serializer
 from Bubot_CoAP.utils import Tree, Timer
 from Bubot_CoAP.layers.endpoint_layer import EndpointLayer
 
+from aio_dtls.connection_manager.connection_manager import ConnectionManager
+
 __author__ = 'Giacomo Tanganelli'
 
 logger = logging.getLogger(__name__)
@@ -54,7 +56,8 @@ class Server:
         self.observe_layer = ObserveLayer()
         self.request_layer = RequestLayer(self)
         self.resource_layer = ResourceLayer(self)
-        self.callback_layer = CallbackLayer()
+        self.callback_layer = CallbackLayer(self)
+        self.dtls_connection_manager = ConnectionManager(secret='test')
         # Resource directory
         root = Resource('root', self, visible=False, observable=False, allow_children=False)
         root.path = '/'
@@ -133,7 +136,7 @@ class Server:
                     transaction.response.source = (transaction.response.source[0], None)
                 self.send_datagram(transaction.response)
 
-    async def send_message(self, message, no_response=False):
+    async def send_message(self, message, no_response=False, **kwargs):
         if isinstance(message, Request):
             request = self.request_layer.send_request(message)
             request = self.observe_layer.send_request(request)
@@ -146,7 +149,7 @@ class Server:
             self.send_datagram(transaction.request)
             if transaction.request.type == defines.Types["CON"]:
                 await self.start_retransmission(transaction, transaction.request)
-            return await self.callback_layer.wait(request)
+            return await self.callback_layer.wait(request, **kwargs)
         elif isinstance(message, Message):
             message = self.observe_layer.send_empty(message)
             message = self.message_layer.send_empty(None, None, message)
@@ -169,7 +172,8 @@ class Server:
         logger.info("send_datagram - " + str(message))
         serializer = Serializer()
         raw_message = serializer.serialize(message)
-        endpoint.sock.sendto(raw_message, message.destination)
+
+        endpoint.send(raw_message, message.destination)
 
     def add_resource(self, path, resource):
         """
@@ -225,6 +229,7 @@ class Server:
         Helper function to add endpoint to the endpoint directory during server initialization.
 
         :param endpoint: the endpoint to be added
+
         """
         return await self.endpoint_layer.add_by_netloc(url, **kwargs)
 

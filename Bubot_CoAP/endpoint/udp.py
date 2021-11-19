@@ -13,7 +13,7 @@ class UdpCoapEndpoint(Endpoint):
     """
     Class to handle the EndPoint.
     """
-    _scheme = 'coap'
+    scheme = 'coap'
 
     def __init__(self, **kwargs):
         """
@@ -81,6 +81,9 @@ class UdpCoapEndpoint(Endpoint):
         else:
             raise NotImplemented(f'Protocol not supported {family}')
         return result
+
+    def send(self, data, address):
+        self._sock.sendto(data, address)
 
     @classmethod
     def init_unicast_ip4_by_address(cls, address, **kwargs):
@@ -152,17 +155,19 @@ class UdpCoapEndpoint(Endpoint):
             )
         return self
 
-    async def run(self, server, protocol_factory):
-        self._transport, self._protocol = await server.loop.create_datagram_endpoint(
+    async def create_datagram_endpoint(self, server, protocol_factory):
+        return await server.loop.create_datagram_endpoint(
             lambda: protocol_factory(server, self), sock=self._sock)
 
+    async def listen(self, server, protocol_factory):
+        self._transport, self._protocol = await self.create_datagram_endpoint(server, protocol_factory)
         _address = self._transport.get_extra_info('socket').getsockname()
-        source_port = self.address[1]
+        source_port = self._address[1]
         if source_port:
             if source_port != _address[1]:
                 raise Exception(f'source port {source_port} not installed')
-        # self._address = (_address[0], _address[1])
-        self._address = (self._address[0], _address[1])
+        else:
+            self._address = (self._address[0], _address[1])
         logger.debug(f'run {"multicast " if self._multicast else ""}endpoint {_address[0]}:{_address[1]}')
         # _address = socket.getaddrinfo(socket.gethostname(), _address[1], socket.AF_INET, socket.SOCK_DGRAM)[0][4]
 

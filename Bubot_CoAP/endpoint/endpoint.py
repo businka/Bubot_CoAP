@@ -1,6 +1,5 @@
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -22,7 +21,7 @@ class Endpoint:
 
     @property
     def address(self):
-        return (self._address[0], self._address[1])
+        return self._address[0], self._address[1]
 
     # @address.setter
     # def address(self, value):
@@ -32,5 +31,8 @@ class Endpoint:
     def family(self):
         return self._family
 
-    async def run(self, server, protocol_factory):
+    async def listen(self, server, protocol_factory):
+        raise NotImplemented()
+
+    def send(self, data, address):
         raise NotImplemented()

@@ -872,7 +872,9 @@ class Message(object):
 
 
 def cbor_loads(payload):
-    return cbor2.loads(payload)
+    if payload:
+        return cbor2.loads(payload)
+    return payload
 
 
 def cbor_dumps(payload):
@@ -880,7 +882,11 @@ def cbor_dumps(payload):
 
 
 def string_encode(payload):
-    return bytes(payload, "utf-8")
+    return bytes(payload, "utf-8") if payload else b''
+
+
+def string_decode(payload):
+    return payload.decode("utf-8") if payload else ''
 
 
 encoder = {
@@ -890,7 +896,7 @@ encoder = {
 }
 
 decoder = {
-    0: string_encode,
+    0: string_decode,
     60: cbor_loads,
     10000: cbor_loads
 }

@@ -54,10 +54,8 @@ class RequestLayer(object):
         """
         wkc_resource_is_defined = defines.DISCOVERY_URL in self._server.root
         path = str("/" + transaction.request.uri_path)
-        transaction.response = Response()
-        transaction.response.destination = transaction.request.source
+        transaction.response = Response.init_from_request(transaction.request)
         transaction.response.source = transaction.request.destination
-        transaction.response.token = transaction.request.token
         if path == defines.DISCOVERY_URL and not wkc_resource_is_defined:
             transaction = await self._server.resource_layer.discover(transaction)
         else:
@@ -83,10 +81,8 @@ class RequestLayer(object):
         :return: the edited transaction with the response to the request
         """
         path = str("/" + transaction.request.uri_path)
-        transaction.response = Response()
-        transaction.response.destination = transaction.request.source
+        transaction.response = Response.init_from_request(transaction.request)
         transaction.response.source = transaction.request.destination
-        transaction.response.token = transaction.request.token
         try:
             resource = self._server.root[path]
         except KeyError:
@@ -109,10 +105,8 @@ class RequestLayer(object):
         :return: the edited transaction with the response to the request
         """
         path = str("/" + transaction.request.uri_path)
-        transaction.response = Response()
-        transaction.response.destination = transaction.request.source
+        transaction.response = Response.init_from_request(transaction.request)
         transaction.response.source = transaction.request.destination
-        transaction.response.token = transaction.request.token
 
         # Create request
         transaction = await self._server.resource_layer.create_resource(path, transaction)
@@ -128,10 +122,8 @@ class RequestLayer(object):
         :return: the edited transaction with the response to the request
         """
         path = str("/" + transaction.request.uri_path)
-        transaction.response = Response()
-        transaction.response.destination = transaction.request.source
+        transaction.response = Response.init_from_request(transaction.request)
         transaction.response.source = transaction.request.destination
-        transaction.response.token = transaction.request.token
         try:
             resource = self._server.root[path]
         except KeyError:

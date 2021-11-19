@@ -31,6 +31,8 @@ class MessageLayer(object):
         self.server = server
         self._transactions = {}
         self._transactions_token = {}
+        self._transactions_sent = {}
+        self._transactions_sent_token = {}
         if starting_mid is not None:
             self._current_mid = starting_mid
         else:
@@ -50,6 +52,10 @@ class MessageLayer(object):
         self._current_mid += 1
         self._current_mid %= 65535
         return current_mid
+
+    def purge_sent(self, k):
+        del self._transactions_sent_token[k]
+        self.server.block_layer.purge_sent(k)
 
     def purge(self, timeout_time=defines.EXCHANGE_LIFETIME):
         for k in list(self._transactions.keys()):
@@ -134,17 +140,17 @@ class MessageLayer(object):
         # key_mid_multicast = utils.str_append_hash(all_coap_nodes, port, response.mid)
         key_token = utils.str_append_hash(host, port, response.token)
         key_token_multicast = utils.str_append_hash(response.destination[0], response.destination[1], response.token)
-        if key_mid in list(self._transactions.keys()):
-            transaction = self._transactions[key_mid]
+        if key_mid in list(self._transactions_sent.keys()):
+            transaction = self._transactions_sent[key_mid]
             if response.token != transaction.request.token:
                 logger.warning("Tokens does not match -  response message " + str(host) + ":" + str(port))
                 return None, False
-        elif key_token in self._transactions_token:
-            transaction = self._transactions_token[key_token]
-        # elif key_mid_multicast in list(self._transactions.keys()):
-        #     transaction = self._transactions[key_mid_multicast]
-        elif key_token_multicast in self._transactions_token:
-            transaction = self._transactions_token[key_token_multicast]
+        elif key_token in self._transactions_sent_token:
+            transaction = self._transactions_sent_token[key_token]
+        # elif key_mid_multicast in list(self._transactions_sent.keys()):
+        #     transaction = self._transactions_sent[key_mid_multicast]
+        elif key_token_multicast in self._transactions_sent_token:
+            transaction = self._transactions_sent_token[key_token_multicast]
             if response.token != transaction.request.token:
                 logger.warning("Tokens does not match -  response message " + str(host) + ":" + str(port))
                 return None, False
@@ -245,16 +251,16 @@ class MessageLayer(object):
 
         if request.multicast:
             key_token = utils.str_append_hash(request.source[0], request.source[1], request.token)
-            self._transactions_token[key_token] = transaction
-            return self._transactions_token[key_token]
+            self._transactions_sent_token[key_token] = transaction
+            return self._transactions_sent_token[key_token]
         else:
             key_mid = utils.str_append_hash(host, port, request.mid)
-            self._transactions[key_mid] = transaction
+            self._transactions_sent[key_mid] = transaction
 
             key_token = utils.str_append_hash(host, port, request.token)
-            self._transactions_token[key_token] = transaction
+            self._transactions_sent_token[key_token] = transaction
 
-            return self._transactions[key_mid]
+            return self._transactions_sent[key_mid]
 
     def send_response(self, transaction):
         """

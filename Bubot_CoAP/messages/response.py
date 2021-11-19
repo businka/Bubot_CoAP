@@ -122,3 +122,11 @@ class Response(Message):
         Delete the MaxAge of the response.
         """
         self.del_option_by_number(defines.OptionRegistry.MAX_AGE.number)
+
+    @classmethod
+    def init_from_request(cls, request):
+        self = cls()
+        self.destination = request.source
+        self.scheme = request.scheme
+        self.token = request.token
+        return self

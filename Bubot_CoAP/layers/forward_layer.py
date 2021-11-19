@@ -30,18 +30,14 @@ class ForwardLayer(object):
         """
         uri = transaction.request.proxy_uri
         if uri is None:
-            transaction.response = Response()
-            transaction.response.destination = transaction.request.source
-            transaction.response.token = transaction.request.token
+            transaction.response = Response.init_from_request(transaction.request)
             transaction.response.type = defines.Types["RST"]
             transaction.response.code = defines.Codes.BAD_REQUEST.number
             return transaction
 
         host, port, path = parse_uri(uri)
         path = str("/" + path)
-        transaction.response = Response()
-        transaction.response.destination = transaction.request.source
-        transaction.response.token = transaction.request.token
+        transaction.response = Response.init_from_request(transaction.request)
         return self._forward_request(transaction, (host, port), path)
 
     def receive_request_reverse(self, transaction):
@@ -55,9 +51,7 @@ class ForwardLayer(object):
         """
         wkc_resource_is_defined = defines.DISCOVERY_URL in self._server.root
         path = str("/" + transaction.request.uri_path)
-        transaction.response = Response()
-        transaction.response.destination = transaction.request.source
-        transaction.response.token = transaction.request.token
+        transaction.response = Response.init_from_request(transaction.request)
         if path == defines.DISCOVERY_URL and not wkc_resource_is_defined:
             transaction = self._server.resource_layer.discover(transaction)
         else:

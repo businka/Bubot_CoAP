@@ -19,7 +19,34 @@ the :class:`Code` class for details.
 
 from Bubot_CoAP.utils import ExtensibleIntEnum
 
-
+# COAP_CODE_EMPTY_MESSAGE = COAP_CODE(0,00),
+#   COAP_CODE_GET = COAP_CODE(0,01),
+#   COAP_CODE_POST = COAP_CODE(0,02),
+#   COAP_CODE_PUT = COAP_CODE(0,03),
+#   COAP_CODE_DELETE = COAP_CODE(0,04),
+#   COAP_CODE_201_CREATED = COAP_CODE(2,01),
+#   COAP_CODE_202_DELETED = COAP_CODE(2,02),
+#   COAP_CODE_203_VALID = COAP_CODE(2,03),
+#   COAP_CODE_204_CHANGED = COAP_CODE(2,04),
+#   COAP_CODE_205_CONTENT = COAP_CODE(2,05),
+#   COAP_CODE_231_CONTINUE = COAP_CODE(2,31),
+#   COAP_CODE_400_BAD_REQUEST = COAP_CODE(4,00),
+#   COAP_CODE_401_UNAUTHORIZED = COAP_CODE(4,01),
+#   COAP_CODE_402_BAD_OPTION = COAP_CODE(4,02),
+#   COAP_CODE_403_FORBIDDEN = COAP_CODE(4,03),
+#   COAP_CODE_404_NOT_FOUND = COAP_CODE(4,04),
+#   COAP_CODE_405_METHOD_NOT_ALLOWED = COAP_CODE(4,05),
+#   COAP_CODE_406_NOT_ACCEPTABLE = COAP_CODE(4,06),
+#   COAP_CODE_408_REQUEST_ENTITY_INCOMPLETE = COAP_CODE(4,08),
+#   COAP_CODE_412_PRECONDITION_FAILED = COAP_CODE(4,12),
+#   COAP_CODE_413_REQUEST_ENTITY_TOO_LARGE = COAP_CODE(4,13),
+#   COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT = COAP_CODE(4,15),
+#   COAP_CODE_500_INTERNAL_SERVER_ERROR = COAP_CODE(5,00),
+#   COAP_CODE_501_NOT_IMPLEMENTED = COAP_CODE(5,01),
+#   COAP_CODE_502_BAD_GATEWAY = COAP_CODE(5,02),
+#   COAP_CODE_503_SERVICE_UNAVAILABLE = COAP_CODE(5,03),
+#   COAP_CODE_504_GATEWAY_TIMEOUT = COAP_CODE(5,04),
+#   COAP_CODE_505_PROXYING_NOT_SUPPORTED = COAP_CODE(5,05)
 class Code(ExtensibleIntEnum):
     """Value for the CoAP "Code" field.
 
@@ -70,18 +97,22 @@ class Code(ExtensibleIntEnum):
 
     def is_request(self):
         """True if the code is in the request code range"""
-        return True if (self >= 1 and self < 32) else False
+        return True if 1 <= self < 32 else False
 
     def is_response(self):
         """True if the code is in the response code range"""
-        return True if (self >= 64 and self < 192) else False
+        return True if 64 <= self < 192 else False
+
+    def is_error(self):
+        """True if the code is in the response code range"""
+        return True if 128 <= self < 224 else False
 
     def is_signalling(self):
         return True if self >= 224 else False
 
     def is_successful(self):
         """True if the code is in the successful subrange of the response code range"""
-        return True if (self >= 64 and self < 96) else False
+        return True if 64 <= self < 96 else False
 
     def can_have_payload(self):
         """True if a message with that code can carry a payload. This is not

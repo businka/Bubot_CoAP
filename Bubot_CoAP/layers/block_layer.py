@@ -102,9 +102,7 @@ class BlockLayer(object):
             else:
                 # Continue
                 transaction.block_transfer = True
-                transaction.response = Response()
-                transaction.response.destination = transaction.request.source
-                transaction.response.token = transaction.request.token
+                transaction.response = Response.init_from_request(transaction.request)
                 transaction.response.code = defines.Codes.CONTINUE.number
                 transaction.response.block1 = (num, m, size)
 
@@ -261,8 +259,15 @@ class BlockLayer(object):
 
         return transaction
 
+    def purge_sent(self, key_token):
+        pass
+        # del self._block2_receive[key_token]
+
     def purge(self, key_token):
-        del self._block2_receive[key_token]
+        try:
+            del self._block2_receive[key_token]
+        except KeyError:
+            pass
 
     def send_request(self, request):
         """
@@ -310,9 +315,7 @@ class BlockLayer(object):
         :return: the edited transaction
         """
         transaction.block_transfer = True
-        transaction.response = Response()
-        transaction.response.destination = transaction.request.source
-        transaction.response.token = transaction.request.token
+        transaction.response = Response.init_from_request(transaction.request)
         transaction.response.code = defines.Codes.REQUEST_ENTITY_INCOMPLETE.number
         return transaction
 
@@ -327,9 +330,7 @@ class BlockLayer(object):
         :return: the edited transaction
         """
         transaction.block_transfer = True
-        transaction.response = Response()
-        transaction.response.destination = transaction.request.source
+        transaction.response = Response.init_from_request(transaction.request)
         transaction.response.type = defines.Types["RST"]
-        transaction.response.token = transaction.request.token
         transaction.response.code = code
         return transaction
