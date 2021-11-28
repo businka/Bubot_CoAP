@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 import time
-from Bubot_CoAP import defines
+import defines
 
-from Bubot_CoAP.resources.resource import Resource
+from resources.resource import Resource
 
 __author__ = 'Giacomo Tanganelli'
 
@@ -160,7 +160,7 @@ class XMLResource(Resource):
     def __init__(self, name="XML"):
         super(XMLResource, self).__init__(name)
         self.value = 0
-        self.payload = (defines.Content_types["application/xml"], "<value>"+str(self.value)+"</value>")
+        self.payload = (defines.Content_types["application/xml"], "<value>" + str(self.value) + "</value>")
 
     async def render_GET(self, request):
         return self
@@ -175,9 +175,9 @@ class MultipleEncodingResource(Resource):
 
     async def render_GET(self, request):
         if request.accept == defines.Content_types["application/xml"]:
-            self.payload = (defines.Content_types["application/xml"],  "<value>"+str(self.value)+"</value>")
+            self.payload = (defines.Content_types["application/xml"], "<value>" + str(self.value) + "</value>")
         elif request.accept == defines.Content_types["application/json"]:
-            self.payload = (defines.Content_types["application/json"], "{'value': '"+str(self.value)+"'}")
+            self.payload = (defines.Content_types["application/json"], "{'value': '" + str(self.value) + "'}")
         elif request.accept == defines.Content_types["text/plain"]:
             self.payload = (defines.Content_types["text/plain"], str(self.value))
         return self
@@ -225,7 +225,7 @@ class AdvancedResource(Resource):
 
     async def render_POST_advanced(self, request, response):
         self.payload = request.payload
-        from Bubot_CoAP.messages.response import Response
+        from messages.response import Response
         assert(isinstance(response, Response))
         response.payload = "Response changed through POST"
         response.code = defines.Codes.CREATED.number
@@ -233,7 +233,7 @@ class AdvancedResource(Resource):
 
     async def render_PUT_advanced(self, request, response):
         self.payload = request.payload
-        from Bubot_CoAP.messages.response import Response
+        from messages.response import Response
         assert(isinstance(response, Response))
         response.payload = "Response changed through PUT"
         response.code = defines.Codes.CHANGED.number

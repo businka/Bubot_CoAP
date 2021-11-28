@@ -1,14 +1,13 @@
-from Bubot_CoAP.server import Server
+from server import Server
 import asyncio
 import logging
 import cbor2
-from Bubot_CoAP import defines
-from Bubot_CoAP.messages.request import Request
-from Bubot_CoAP.messages.option import Option
-from Bubot_CoAP.utils import generate_random_token
+import defines
+from messages.request import Request
+from messages.option import Option
 
-from Bubot_CoAP.messages.numbers import NON, Code
-from Bubot_CoAP.resources.resource import Resource
+from messages.numbers import NON, Code
+from resources.resource import Resource
 
 logger = logging.getLogger()
 logger.addHandler(logging.StreamHandler())

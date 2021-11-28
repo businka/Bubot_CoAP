@@ -4,8 +4,8 @@ import logging
 import threading
 import time
 
-from Bubot_CoAP import defines
-from Bubot_CoAP.resources.resource import Resource
+import defines
+from resources.resource import Resource
 
 __author__ = 'Giacomo Tanganelli'
 

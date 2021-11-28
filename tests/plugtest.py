@@ -6,12 +6,12 @@ import socket
 import threading
 import unittest
 
-from Bubot_CoAP.messages.message import Message
+from messages.message import Message
 from example.coapclient import HelperClient
-from Bubot_CoAP.messages.response import Response
-from Bubot_CoAP.messages.request import Request
-from Bubot_CoAP import defines
-from Bubot_CoAP.serializer import Serializer
+from messages.response import Response
+from messages.request import Request
+import defines
+from serializer import Serializer
 from tests.plugtest_coapserver import CoAPServerPlugTest
 
 __author__ = 'Giacomo Tanganelli'

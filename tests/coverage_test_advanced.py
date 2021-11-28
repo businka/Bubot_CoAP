@@ -6,11 +6,11 @@ from queue import Queue
 import random
 
 from example.coapserver import CoAPServer
-from Bubot_CoAP import defines
-from Bubot_CoAP.client.helperclient import HelperClient
-from Bubot_CoAP.messages.option import Option
-from Bubot_CoAP.messages.request import Request
-from Bubot_CoAP.messages.response import Response
+import defines
+from src.Bubot_CoAP import HelperClient
+from messages.option import Option
+from messages.request import Request
+from messages.response import Response
 
 
 class Tests(unittest.TestCase):

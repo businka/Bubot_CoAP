@@ -9,11 +9,11 @@ import unittest
 from example.coapclient import HelperClient
 from example.coapforwardproxy import CoAPForwardProxy
 from example.coapserver import CoAPServer
-from Bubot_CoAP import defines
-from Bubot_CoAP.messages.option import Option
-from Bubot_CoAP.messages.request import Request
-from Bubot_CoAP.messages.response import Response
-from Bubot_CoAP.serializer import Serializer
+import defines
+from messages.option import Option
+from messages.request import Request
+from messages.response import Response
+from serializer import Serializer
 
 __author__ = 'Giacomo Tanganelli'
 __version__ = "2.0"

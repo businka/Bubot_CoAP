@@ -2,7 +2,7 @@
 
 import getopt
 import sys
-from Bubot_CoAP.server import Server
+from server import Server
 from .exampleresources import BasicResource, Long, Separate, Storage, Big, voidResource, XMLResource, ETAGResource, \
     Child, \
     MultipleEncodingResource, AdvancedResource, AdvancedResourceSeparate

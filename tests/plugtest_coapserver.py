@@ -1,7 +1,7 @@
 import getopt
 import sys
 
-from Bubot_CoAP.server.coap import CoAP
+from server import CoAP
 from tests.plugtest_resources import TestResource, SeparateResource, ObservableResource, LargeResource, LargeUpdateResource, \
     LongResource
 

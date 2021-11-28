@@ -5,16 +5,15 @@ import random
 import socket
 import asyncio
 import logging
-import threading
 import unittest
 
-from Bubot_CoAP.server import Server
-from Bubot_CoAP import defines
-from Bubot_CoAP.messages.message import Message
-from Bubot_CoAP.messages.option import Option
-from Bubot_CoAP.messages.request import Request
-from Bubot_CoAP.messages.response import Response
-from Bubot_CoAP.serializer import Serializer
+from server import Server
+import defines
+from messages.message import Message
+from messages.option import Option
+from messages.request import Request
+from messages.response import Response
+from serializer import Serializer
 
 from tests.exampleresources import BasicResource, Long, Separate, Storage, Big, voidResource, XMLResource, ETAGResource, \
     Child, \

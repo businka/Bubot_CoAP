@@ -1,6 +1,6 @@
 import unittest
 from mbed_tls.mbed_tls_datagram_protocol import TlsDatagramProtocol
-from Bubot_CoAP.mbed_tls.ssl_msg import SslMsg
+from src.Bubot_CoAP import SslMsg
 import logging
 
 logger = logging.getLogger()

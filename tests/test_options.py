@@ -1,8 +1,8 @@
 import unittest
-from Bubot_CoAP.messages.message import Message
-from Bubot_CoAP.messages.option import Option
-from Bubot_CoAP.messages.options import Options
-from Bubot_CoAP import defines
+from messages.message import Message
+from messages.option import Option
+from messages import Options
+import defines
 
 
 class Tests(unittest.TestCase):
