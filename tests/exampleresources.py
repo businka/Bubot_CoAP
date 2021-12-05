@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 import time
-import defines
 
-from resources.resource import Resource
+from Bubot_CoAP import defines
+from Bubot_CoAP.resources.resource import Resource
 
 __author__ = 'Giacomo Tanganelli'
 
@@ -226,7 +226,7 @@ class AdvancedResource(Resource):
     async def render_POST_advanced(self, request, response):
         self.payload = request.payload
         from messages.response import Response
-        assert(isinstance(response, Response))
+        assert (isinstance(response, Response))
         response.payload = "Response changed through POST"
         response.code = defines.Codes.CREATED.number
         return self, response
@@ -234,7 +234,7 @@ class AdvancedResource(Resource):
     async def render_PUT_advanced(self, request, response):
         self.payload = request.payload
         from messages.response import Response
-        assert(isinstance(response, Response))
+        assert (isinstance(response, Response))
         response.payload = "Response changed through PUT"
         response.code = defines.Codes.CHANGED.number
         return self, response
@@ -257,7 +257,6 @@ class AdvancedResourceSeparate(Resource):
         return self, response, self.render_POST_separate
 
     async def render_PUT_advanced(self, request, response):
-
         return self, response, self.render_PUT_separate
 
     async def render_DELETE_advanced(self, request, response):

@@ -7,13 +7,13 @@ import asyncio
 import logging
 import unittest
 
-from server import Server
-import defines
-from messages.message import Message
-from messages.option import Option
-from messages.request import Request
-from messages.response import Response
-from serializer import Serializer
+from Bubot_CoAP.server import Server
+from Bubot_CoAP import defines
+from Bubot_CoAP.messages.message import Message
+from Bubot_CoAP.messages.option import Option
+from Bubot_CoAP.messages.request import Request
+from Bubot_CoAP.messages.response import Response
+from Bubot_CoAP.serializer import Serializer
 
 from tests.exampleresources import BasicResource, Long, Separate, Storage, Big, voidResource, XMLResource, ETAGResource, \
     Child, \
@@ -70,8 +70,8 @@ logging.basicConfig(level=logging.DEBUG)
 class Tests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self) -> None:
-        self.server_address = ("127.0.0.1", 5683)
-        self.client_address = ("127.0.0.1", 5684)
+        self.server_address = ("127.0.0.1", 20001)
+        self.client_address = ("127.0.0.1", 30001)
         self.current_mid = random.randint(1, 1000)
         self.server_mid = random.randint(1000, 2000)
         self.server = Server()
@@ -102,18 +102,21 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         client = Server()
         await client.add_endpoint(f'coap://{self.client_address[0]}:{self.client_address[1]}')
         for message, expected in message_list:
+            received_message = Response()
             if message is not None:
-                received_message = await client.send_message(message)
+                message.destination = self.server_address
+                message.source = self.client_address
+                received_message: Response = await client.send_message(message)
             if expected is not None:
                 if expected.type is not None:
-                    self.assertEqual(received_message.type, expected.type)
+                    self.assertEqual(received_message.type, expected.type, 'type')
                 if expected.mid is not None:
-                    self.assertEqual(received_message.mid, expected.mid)
+                    self.assertEqual(received_message.mid, expected.mid, 'mid')
                 self.assertEqual(received_message.code, expected.code)
                 if expected.source is not None:
                     self.assertEqual(received_message.source, self.server_address)
                 if expected.token is not None:
-                    self.assertEqual(received_message.token, expected.token)
+                    self.assertEqual(received_message.token, expected.token, 'token')
                 if expected.payload is not None:
                     self.assertEqual(received_message.payload, expected.payload)
                 if expected.options:
@@ -122,7 +125,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
                         assert isinstance(o, Option)
                         option_value = getattr(expected, o.name.lower().replace("-", "_"))
                         option_value_rec = getattr(received_message, o.name.lower().replace("-", "_"))
-                        self.assertEqual(option_value, option_value_rec)
+                        self.assertEqual(option_value, option_value_rec, f'option {o.name}')
         await client.close()
 
     async def _test_with_client_observe(self, message_list):  # pragma: no cover
@@ -160,8 +163,10 @@ class Tests(unittest.IsolatedAsyncioTestCase):
     async def _test_plugtest(self, message_list):  # pragma: no cover
         serializer = Serializer()
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind(self.client_address)
         for message, expected in message_list:
             if message is not None:
+                message.source = self.client_address
                 datagram = serializer.serialize(message)
                 sock.sendto(datagram, message.destination)
             if expected is not None:
@@ -233,7 +238,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.METHOD_NOT_ALLOWED.number
-        expected.token = None
+        #  expected.token = None
 
         exchange1 = (req, expected)
 
@@ -250,7 +255,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.METHOD_NOT_ALLOWED.number
-        expected.token = None
+        #  expected.token = None
 
         exchange2 = (req, expected)
 
@@ -267,7 +272,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.METHOD_NOT_ALLOWED.number
-        expected.token = None
+        #  expected.token = None
 
         exchange3 = (req, expected)
 
@@ -284,7 +289,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.METHOD_NOT_ALLOWED.number
-        expected.token = None
+        #  expected.token = None
 
         exchange4 = (req, expected)
 
@@ -306,7 +311,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["CON"]
         expected._mid = None
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.max_age = 60
 
         exchange1 = (req, expected)
@@ -318,13 +323,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
         req.destination = self.server_address
-        req.payload = "POST"
+        req.payload = b"POST"
 
         expected = Response()
         expected.type = defines.Types["CON"]
         expected._mid = None
         expected.code = defines.Codes.CHANGED.number
-        expected.token = None
+        #  expected.token = None
         expected.options = None
 
         exchange2 = (req, expected)
@@ -336,13 +341,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
         req.destination = self.server_address
-        req.payload = "PUT"
+        req.payload = b"PUT"
 
         expected = Response()
         expected.type = defines.Types["CON"]
         expected._mid = None
         expected.code = defines.Codes.CHANGED.number
-        expected.token = None
+        #  expected.token = None
         expected.options = None
 
         exchange3 = (req, expected)
@@ -359,7 +364,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["CON"]
         expected._mid = None
         expected.code = defines.Codes.DELETED.number
-        expected.token = None
+        #  expected.token = None
 
         exchange4 = (req, expected)
         self.current_mid += 1
@@ -376,14 +381,14 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
         req.destination = self.server_address
-        req.payload = "test"
+        req.payload = b"test"
         req.add_if_none_match()
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CREATED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.location_path = "storage/new_res"
         expected.location_query = "id=1"
@@ -403,8 +408,8 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
-        expected.payload = "test"
+        #  expected.token = None
+        expected.payload = b"test"
 
         exchange2 = (req, expected)
         self.current_mid += 1
@@ -416,13 +421,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req._mid = self.current_mid
         req.destination = self.server_address
         req.if_match = ["not"]
-        req.payload = "not"
+        req.payload = b"not"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.PRECONDITION_FAILED.number
-        expected.token = None
+        #  expected.token = None
 
         exchange3 = (req, expected)
         self.current_mid += 1
@@ -434,13 +439,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req._mid = self.current_mid
         req.destination = self.server_address
         req.if_match = ["not"]
-        req.payload = "not"
+        req.payload = b"not"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.PRECONDITION_FAILED.number
-        expected.token = None
+        #  expected.token = None
 
         exchange4 = (req, expected)
         self.current_mid += 1
@@ -451,13 +456,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req._mid = self.current_mid
         req.destination = self.server_address
         req.add_if_none_match()
-        req.payload = "not"
+        req.payload = b"not"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.PRECONDITION_FAILED.number
-        expected.token = None
+        #  expected.token = None
 
         exchange5 = (req, expected)
         self.current_mid += 1
@@ -481,7 +486,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.REQUEST_ENTITY_INCOMPLETE.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange1 = (req, expected)
@@ -500,7 +505,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTINUE.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block1 = (0, 1, 1024)
 
@@ -520,7 +525,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTINUE.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block1 = (1, 1, 64)
 
@@ -540,7 +545,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.REQUEST_ENTITY_INCOMPLETE.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange4 = (req, expected)
@@ -559,7 +564,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CREATED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.location_path = "storage/new_res"
 
@@ -585,7 +590,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block2 = (0, 1, defines.MAX_PAYLOAD)
         expected.size2 = 2041
@@ -606,7 +611,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block2 = (0, 1, 512)
         expected.size2 = 2041
@@ -627,7 +632,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block2 = (1, 1, 256)
         expected.size2 = 2041
@@ -648,7 +653,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block2 = (2, 1, 128)
         expected.size2 = 2041
@@ -669,7 +674,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block2 = (3, 1, 64)
         expected.size2 = 2041
@@ -690,7 +695,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block2 = (4, 1, 32)
         expected.size2 = 2041
@@ -711,7 +716,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block2 = (5, 1, 16)
         expected.size2 = 2041
@@ -732,7 +737,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block2 = (6, 0, 1024)
         expected.size2 = 2041
@@ -753,7 +758,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block2 = (7, 0, 1024)
         expected.size2 = 2041
@@ -781,7 +786,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTINUE.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block1 = (0, 1, 16)
 
@@ -801,7 +806,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTINUE.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block1 = (1, 1, 32)
 
@@ -821,7 +826,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTINUE.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block1 = (2, 1, 64)
 
@@ -841,7 +846,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTINUE.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block1 = (3, 1, 128)
 
@@ -861,7 +866,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTINUE.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block1 = (4, 1, 256)
 
@@ -881,7 +886,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTINUE.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.block1 = (5, 1, 512)
 
@@ -901,7 +906,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CHANGED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange7 = (req, expected)
@@ -924,13 +929,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         option.value = "test"
         req.add_option(option)
         req.del_option(option)
-        req.payload = "test"
+        req.payload = b"test"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CREATED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.location_path = "storage/new_res"
 
@@ -948,13 +953,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         option.value = "test"
         req.add_option(option)
         req.del_option_by_name("ETag")
-        req.payload = "test"
+        req.payload = b"test"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CREATED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.location_path = "storage/new_res"
 
@@ -972,13 +977,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         option.value = "test"
         req.add_option(option)
         del req.etag
-        req.payload = "test"
+        req.payload = b"test"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CREATED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.location_path = "storage/new_res"
 
@@ -1006,12 +1011,12 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         option.number = defines.OptionRegistry.RM_MESSAGE_SWITCHING.number
         option.value = b'\1\1\1\1\0\0'
         req.add_option(option)
-        req.payload = "test"
+        req.payload = b"test"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange1 = (req, expected)
@@ -1026,7 +1031,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.NOT_FOUND.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange21 = (req, expected)
@@ -1066,14 +1071,14 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
         req.destination = self.server_address
-        req.payload = "<value>test</value>"
+        req.payload = b"<value>test</value>"
         req.content_type = defines.Content_types["application/xml"]
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CREATED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.location_path = "storage/new_res"
 
@@ -1091,8 +1096,8 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
-        expected.payload = "Basic Resource"
+        #  expected.token = None
+        expected.payload = b"Basic Resource"
 
         exchange2 = (req, expected)
         self.current_mid += 1
@@ -1103,13 +1108,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
         req.destination = self.server_address
-        req.payload = "test"
+        req.payload = b"test"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CHANGED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange3 = (req, expected)
@@ -1126,8 +1131,8 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
-        expected.payload = "test"
+        #  expected.token = None
+        expected.payload = b"test"
 
         exchange4 = (req, expected)
         self.current_mid += 1
@@ -1144,8 +1149,8 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
-        expected.payload = "<value>test</value>"
+        #  expected.token = None
+        expected.payload = b"<value>test</value>"
         expected.content_type = defines.Content_types["application/xml"]
 
         exchange5 = (req, expected)
@@ -1163,7 +1168,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.NOT_ACCEPTABLE.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange6 = (req, expected)
@@ -1180,8 +1185,8 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
-        expected.payload = "<value>0</value>"
+        #  expected.token = None
+        expected.payload = b"<value>0</value>"
 
         print(expected.pretty_print())
 
@@ -1199,8 +1204,8 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
-        expected.payload = "0"
+        #  expected.token = None
+        expected.payload = b"0"
 
         exchange8 = (req, expected)
         self.current_mid += 1
@@ -1217,8 +1222,8 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
-        expected.payload = "<value>0</value>"
+        #  expected.token = None
+        expected.payload = b"<value>0</value>"
         expected.content_type = defines.Content_types["application/xml"]
 
         exchange9 = (req, expected)
@@ -1236,8 +1241,8 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
-        expected.payload = "{'value': '0'}"
+        #  expected.token = None
+        expected.payload = b"{'value': '0'}"
         expected.content_type = defines.Content_types["application/json"]
 
         exchange10 = (req, expected)
@@ -1255,14 +1260,15 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.uri_path = path
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
+        req.token = None
         req.destination = self.server_address
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
-        expected.payload = "ETag resource"
+        expected.token = req.token
+        expected.payload = b"ETag resource"
         expected.etag = bytes("0", "utf-8")
 
         exchange1 = (req, expected)
@@ -1274,13 +1280,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
         req.destination = self.server_address
-        req.payload = "test"
+        req.payload = b"test"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CHANGED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.etag = "1"
 
@@ -1299,8 +1305,8 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.VALID.number
-        expected.token = None
-        expected.payload = "test"
+        #  expected.token = None
+        expected.payload = b"test"
         expected.etag = bytes("1", "utf-8")
 
         exchange3 = (req, expected)
@@ -1312,13 +1318,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
         req.destination = self.server_address
-        req.payload = "echo payload"
+        req.payload = b"echo payload"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CHANGED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange4 = (req, expected)
@@ -1336,13 +1342,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
         req.destination = self.server_address
-        req.payload = "test"
+        req.payload = b"test"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CREATED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.location_path = "child"
 
@@ -1360,8 +1366,8 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
-        expected.payload = "test"
+        #  expected.token = None
+        expected.payload = b"test"
 
         exchange2 = (req, expected)
         self.current_mid += 1
@@ -1372,13 +1378,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
         req.destination = self.server_address
-        req.payload = "testPUT"
+        req.payload = b"testPUT"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.CHANGED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange3 = (req, expected)
@@ -1395,7 +1401,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.DELETED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange4 = (req, expected)
@@ -1431,13 +1437,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
         req.destination = self.server_address
-        req.payload = "test"
+        req.payload = b"test"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.METHOD_NOT_ALLOWED.number
-        expected.token = None
+        #  expected.token = None
 
         exchange2 = (req, expected)
         self.current_mid += 1
@@ -1448,13 +1454,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         req.type = defines.Types["CON"]
         req._mid = self.current_mid
         req.destination = self.server_address
-        req.payload = "testPUT"
+        req.payload = b"testPUT"
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.NOT_FOUND.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange3 = (req, expected)
@@ -1471,7 +1477,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = self.current_mid
         expected.code = defines.Codes.NOT_FOUND.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange4 = (req, expected)
@@ -1566,13 +1572,13 @@ class Tests(unittest.IsolatedAsyncioTestCase):
                       "vel vestibulum ullamcorper. Sed ac metus in urna fermentum feugiat. Nulla nunc diam, sodales " \
                       "aliquam mi id, varius porta nisl. Praesent vel nibh ac turpis rutrum laoreet at non odio. " \
                       "Phasellus ut posuere mi. Suspendisse malesuada velit nec mauris convallis porta. Vivamus " \
-                      "sed ultrices sapien, at cras amet."
+                      "sed ultrices sapien, at cras amet.".encode()
 
         expected = Response()
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CHANGED.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
 
         exchange1 = (req, expected)
@@ -1596,7 +1602,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         expected.type = defines.Types["ACK"]
         expected._mid = None
         expected.code = defines.Codes.CONTENT.number
-        expected.token = None
+        #  expected.token = None
         expected.payload = None
         expected.observe = 1
 
