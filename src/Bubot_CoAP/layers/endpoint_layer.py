@@ -120,7 +120,7 @@ class EndpointLayer:
             if source_address[1] is None:
                 return _tmp[list(_tmp.keys())[0]]
             return _tmp.get(source_address[1])
-        raise Exception('source address not defined')
+        # raise Exception('source address not defined')
         # else:
         # return self._unicast_endpoints[scheme][family]['default']
 

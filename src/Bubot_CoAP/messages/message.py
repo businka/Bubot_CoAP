@@ -820,7 +820,8 @@ class Message(object):
             if isinstance(self.payload, dict):
                 tmp = list(self.payload.values())[0][0:20]
             else:
-                tmp = self.payload[0:20]
+                tmp = str(self.decode_payload())[0:20]
+                # tmp = self.payload[0:20]
             msg += " {payload}...{length} bytes".format(payload=tmp, length=len(self.payload))
         else:
             msg += " No payload"

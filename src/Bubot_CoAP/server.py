@@ -147,7 +147,6 @@ class Server:
                 self.send_datagram(request)
                 return
             transaction = self.message_layer.send_request(request)
-            logger.debug(f'Send request {request}')
             self.send_datagram(transaction.request)
             if transaction.request.type == defines.Types["CON"]:
                 await self.start_retransmission(transaction, transaction.request)
@@ -171,7 +170,7 @@ class Server:
         if not endpoint:
             raise KeyError(f'endpoint for {message.source}')
         message.source = endpoint.address
-        logger.debug(f"send datagram {message}")
+        logger.info(f"send datagram {message}")
         serializer = Serializer()
         raw_message = serializer.serialize(message)
 
@@ -350,18 +349,19 @@ class Server:
         """
         await timer.cancel()
 
-    async def send_ack(self, transaction):
+    async def send_ack(self, transaction, message=None):
         """
         Sends an ACK message for the request.
 
         :param transaction: the transaction that owns the request
         """
-
+        if message is None:
+            message = transaction.request
         ack = Message()
         ack.type = defines.Types['ACK']
         async with transaction.lock:
-            if not transaction.request.acknowledged and transaction.request.type == defines.Types["CON"]:
-                ack = self.message_layer.send_empty(transaction, transaction.request, ack)
+            if not message.acknowledged and message.type == defines.Types["CON"]:
+                ack = self.message_layer.send_empty(transaction, message, ack)
                 if ack.type is not None and ack.mid is not None:
                     self.send_datagram(ack)
 

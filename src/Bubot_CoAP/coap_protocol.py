@@ -31,7 +31,7 @@ class CoapProtocol(DatagramProtocol):
             message.scheme = self.endpoint.scheme
             message.family = self.endpoint.family
 
-            logger.info("receive_datagram - " + str(message))
+            logger.debug("receive_datagram - " + str(message))
             if isinstance(message, Request):
                 self.server.loop.create_task(self.datagram_received_request(message))
             elif isinstance(message, Response):
@@ -77,7 +77,7 @@ class CoapProtocol(DatagramProtocol):
             return
         await self.server.wait_for_retransmit_thread(transaction)
         if send_ack:
-            await self.server.send_ack(transaction)
+            await self.server.send_ack(transaction, transaction.response)
         self.server.block_layer.receive_response(transaction)
         if transaction.block_transfer:
             await self.server.send_block_request(transaction)

@@ -230,7 +230,6 @@ class MessageLayer(object):
         :rtype : Transaction
         :return: the created transaction
         """
-        logger.info("send_request - " + str(request))
         assert isinstance(request, Request)
         try:
             host, port = request.destination
@@ -248,6 +247,7 @@ class MessageLayer(object):
         if transaction.request.token is None:
             transaction.request.token = self.fetch_token()
 
+        # logger.info("send_request - " + str(request))
         if request.multicast:
             key_token = utils.str_append_hash(request.source[0], request.source[1], request.token)
             self._transactions_sent_token[key_token] = transaction
@@ -329,6 +329,7 @@ class MessageLayer(object):
                 message.mid = transaction.request.mid
                 message.code = 0
                 message.destination = transaction.request.source
+                message.source = transaction.request.destination
             elif transaction.response == related:
                 transaction.response.acknowledged = True
                 transaction.completed = True
@@ -336,6 +337,7 @@ class MessageLayer(object):
                 message.code = 0
                 message.token = transaction.response.token
                 message.destination = transaction.response.source
+                message.source = transaction.response.destination
 
         elif message.type == defines.Types["RST"]:
             if transaction.request == related:
