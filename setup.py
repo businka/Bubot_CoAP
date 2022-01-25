@@ -28,5 +28,5 @@ setup(
     #     'coapserver.py',
     #     'exampleresources.py',
     # ],
-    requires=['cachetools', 'cbor2', 'aio_dtls']
+    install_requires=['cachetools', 'cbor2', 'aio_dtls']
 )
