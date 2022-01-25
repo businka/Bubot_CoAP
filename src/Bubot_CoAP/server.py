@@ -144,19 +144,19 @@ class Server:
             if no_response:
                 # don't add the send message to the message layer transactions
                 logger.debug(f'Send no response request {request}')
-                self.send_datagram(request)
+                self.send_datagram(request, **kwargs)
                 return
             transaction = self.message_layer.send_request(request)
-            self.send_datagram(transaction.request)
+            self.send_datagram(transaction.request, **kwargs)
             if transaction.request.type == defines.Types["CON"]:
                 await self.start_retransmission(transaction, transaction.request)
             return await self.callback_layer.wait(request, **kwargs)
         elif isinstance(message, Message):
             message = self.observe_layer.send_empty(message)
             message = self.message_layer.send_empty(None, None, message)
-            self.send_datagram(message)
+            self.send_datagram(message, **kwargs)
 
-    def send_datagram(self, message):
+    def send_datagram(self, message, **kwargs):
         """
         Send a message through the udp socket.
 
@@ -174,7 +174,7 @@ class Server:
         serializer = Serializer()
         raw_message = serializer.serialize(message)
 
-        endpoint.send(bytes(raw_message), message.destination)
+        endpoint.send(bytes(raw_message), message.destination, **kwargs)
 
     def add_resource(self, path, resource):
         """

@@ -1,8 +1,9 @@
-from .udp import UdpCoapEndpoint
-import ssl
 import logging
 import socket
+import ssl
+
 from aio_dtls import DtlsSocket
+from .udp import UdpCoapEndpoint
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,9 @@ class UdpCoapsEndpoint(UdpCoapEndpoint):
         )
         self._sock.bind(address)
         return self
+
+    def send(self, data, address, **kwargs):
+        self._sock.sendto(data, address, **kwargs)
 
     async def listen(self, server, protocol_factory):
         await self._sock.listen(server, protocol_factory)

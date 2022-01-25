@@ -42,7 +42,7 @@ class CoapProtocol(DatagramProtocol):
         except RuntimeError:
             logger.exception("Exception with Executor")
 
-    def error_received(self, exc):
+    def error_received(self, exc, address=None):
         logger.error(f'protocol error received {str(exc)}')
         pass
 

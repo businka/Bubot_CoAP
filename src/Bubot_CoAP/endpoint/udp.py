@@ -82,7 +82,7 @@ class UdpCoapEndpoint(Endpoint):
             raise NotImplemented(f'Protocol not supported {family}')
         return result
 
-    def send(self, data, address):
+    def send(self, data, address, **kwargs):
         self._sock.sendto(data, address)
 
     @classmethod
@@ -172,4 +172,5 @@ class UdpCoapEndpoint(Endpoint):
         # _address = socket.getaddrinfo(socket.gethostname(), _address[1], socket.AF_INET, socket.SOCK_DGRAM)[0][4]
 
     def close(self):
-        self._transport.close()
+        if self._transport:
+            self._transport.close()

@@ -12,8 +12,8 @@ class CallbackLayer:
         self.server = server
         self._waited_answer = {}
 
-    async def wait(self, request: Request, **kwargs):
-        timeout = kwargs.get('timeout')
+    async def wait(self, request: Request, *, timeout=None, **kwargs):
+        # timeout = kwargs.get('timeout')
         if not timeout:
             timeout = MULTICAST_TIMEOUT
         waiter = Waiter(request, **kwargs)

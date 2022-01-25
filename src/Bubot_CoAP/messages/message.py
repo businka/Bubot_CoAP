@@ -810,19 +810,24 @@ class Message(object):
         msg = "From {source}, To {destination}, {type}-{mid}, {code}-{token}, [" \
             .format(source=self._source, destination=self._destination, type=inv_types[self._type], mid=self._mid,
                     code=defines.Codes.LIST[self._code].name, token=token)
+        block = False
         for opt in self._options:
             if 'Block' in opt.name:
+                block = True
                 msg += "{name}: {value}, ".format(name=opt.name, value=utils.parse_blockwise(opt.value))
             else:
                 msg += "{name}: {value}, ".format(name=opt.name, value=opt.value)
         msg += "]"
         if self.payload is not None:
-            if isinstance(self.payload, dict):
-                tmp = list(self.payload.values())[0][0:20]
+            if block:
+                msg += " payload block {length} bytes".format(length=len(self.payload))
             else:
-                tmp = str(self.decode_payload())[0:20]
-                # tmp = self.payload[0:20]
-            msg += " {payload}...{length} bytes".format(payload=tmp, length=len(self.payload))
+                if isinstance(self.payload, dict):
+                    tmp = list(self.payload.values())[0][0:20]
+                else:
+                    tmp = str(self.decode_payload())[0:20]
+                    # tmp = self.payload[0:20]
+                msg += " {payload}...{length} bytes".format(payload=tmp, length=len(self.payload))
         else:
             msg += " No payload"
         return msg
