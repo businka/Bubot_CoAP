@@ -31,7 +31,7 @@ class UdpCoapsEndpoint(UdpCoapEndpoint):
         self._sock = DtlsSocket(
             sock=socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP),
             endpoint=self,
-            # ciphers=""
+            **kwargs.get('socket_props', {})
         )
         self._sock.bind(address)
         return self
@@ -62,3 +62,6 @@ class UdpCoapsEndpoint(UdpCoapEndpoint):
 
     def raw_sendto(self, data, address):
         self._sock.raw_sendto(data, address)
+
+    # async def send_alert(self, data, address, **kwargs):
+    #     self._sock.send_alert(data, address, **kwargs)

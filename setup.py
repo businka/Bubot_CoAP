@@ -1,32 +1,17 @@
-from setuptools import setup
+import setuptools
 
-setup(
+setuptools.setup(
     name='Bubot_CoAP',
-    version='1.0.3',
-    packages=[
-        'coapthon',
-        'coapthon.caching',
-        'coapthon.client',
-        'coapthon.forward_proxy',
-        'coapthon.layers',
-        'coapthon.messages',
-        'coapthon.resources',
-        'coapthon.reverse_proxy',
-        'coapthon.server',
+    version='1.0.4',
+    license='MIT',
+    author='Razgovorov Mikhail',
+    author_email='1338833@gmail.com',
+    url="https://github.com/businka/Bubot_CoAP.git",
+    description='python library to the CoAP protocol.',
+    install_requires=[
+        'cbor2',
+        'aio_dtls'
     ],
-    license='MIT License',
-    author='Giacomo Tanganelli',
-    author_email='giacomo.tanganelli@for.unipi.it',
-    maintainer="Bjoern Freise",
-    maintainer_email="mcfreis@gmx.net",
-    url="https://github.com/mcfreis/CoAPthon3",
-    description='CoAPthon is a python library to the CoAP protocol.',
-    # scripts=[
-    #     'coapclient.py',
-    #     'coapforwardproxy.py',
-    #     'coapreverseproxy.py',
-    #     'coapserver.py',
-    #     'exampleresources.py',
-    # ],
-    install_requires=['cachetools', 'cbor2', 'aio_dtls']
+    package_dir={"": "src"},
+    packages=setuptools.find_packages(where="src"),
 )

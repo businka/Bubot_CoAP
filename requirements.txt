@@ -1,2 +1,4 @@
-cachetools>=2.0.0
+twine
+cbor2
+aio_dtls
 
