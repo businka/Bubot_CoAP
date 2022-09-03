@@ -31,7 +31,10 @@ class EndpointLayer:
         :return:
         """
         async def add_all_address(_family, _result):
-            addr_info = socket.getaddrinfo('', address[1], _family)
+            try:
+                addr_info = socket.getaddrinfo('localhost', address[1], _family)
+            except Exception as err:
+                raise Exception(f'Bad device ip address {err}: {address[1]} {_family}')
             _new_port = None
             for addr in addr_info:
                 if _new_port:
@@ -40,7 +43,7 @@ class EndpointLayer:
                     elif _family == socket.AF_INET6:
                         _address = (addr[4][0], _new_port, addr[4][2], addr[4][3])
                     else:
-                        raise NotImplemented()
+                        raise NotImplementedError()
                 else:
                     _address = addr[4]
                 res = await endpoint.add(self, _address, **kwargs)

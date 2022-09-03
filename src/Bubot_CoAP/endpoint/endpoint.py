@@ -32,7 +32,7 @@ class Endpoint:
         return self._family
 
     async def listen(self, server, protocol_factory):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def send(self, data, address):
-        raise NotImplemented()
+        raise NotImplementedError()
