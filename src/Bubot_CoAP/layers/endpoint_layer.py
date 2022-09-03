@@ -30,9 +30,33 @@ class EndpointLayer:
         :param kwargs:
         :return:
         """
+
+        def extract_ip4():
+            st = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                st.connect(('10.255.255.255', 1))
+                ip = st.getsockname()[0]
+            except Exception:
+                ip = '127.0.0.1'
+            finally:
+                st.close()
+            return ip
+
+        def extract_ip6():
+            raise NotImplementedError('default ipv6 address')
+            st = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+            try:
+                st.connect(('2A00::', 1))
+                ip = st.getsockname()[0]
+            except Exception:
+                ip = '127.0.0.1'
+            finally:
+                st.close()
+            return ip
+
         async def add_all_address(_family, _result):
             try:
-                addr_info = socket.getaddrinfo('localhost', address[1], _family)
+                addr_info = socket.getaddrinfo('', address[1], _family)
             except Exception as err:
                 raise Exception(f'Bad device ip address {err}: {address[1]} {_family}')
             _new_port = None
@@ -62,11 +86,13 @@ class EndpointLayer:
 
         # multicast = kwargs.get('multicast', False)
         if address[0] == '' or address[0] is None:  # IPv4 default
-            await add_all_address(socket.AF_INET, result)
+            address = (extract_ip4(), address[1])
+            # await add_all_address(socket.AF_INET, result)
         elif address[0] == '::':
-            await add_all_address(socket.AF_INET6, result)
-        else:
-            result += await endpoint.add(self, address, **kwargs)
+            address = (extract_ip6(), address[1])
+            # await add_all_address(socket.AF_INET6, result)
+        # else:
+        result += await endpoint.add(self, address, **kwargs)
         return result
 
     async def add(self, endpoint: Endpoint):
@@ -101,7 +127,7 @@ class EndpointLayer:
 
     def find_endpoint(self, *args, scheme=None, family=None, address=None):
         if scheme is None:
-           scheme = self.get_first_elem(self.unicast_endpoints)
+            scheme = self.get_first_elem(self.unicast_endpoints)
         if family is None:
             family = self.get_first_elem(self.unicast_endpoints[scheme])
         if address is None:
