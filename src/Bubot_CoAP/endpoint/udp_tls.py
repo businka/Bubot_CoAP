@@ -57,6 +57,8 @@ class UdpCoapsEndpoint(UdpCoapEndpoint):
 
     async def listen(self, server, protocol_factory):
         await self._sock.listen(server, protocol_factory)
+        if not self.address[1]:
+            self._address = self.sock.address
         logger.debug(f'run {"multicast " if self._multicast else ""}'
                      f'endpoint {self._sock.address[0]}:{self._sock.address[1]}')
 
@@ -65,3 +67,7 @@ class UdpCoapsEndpoint(UdpCoapEndpoint):
 
     # async def send_alert(self, data, address, **kwargs):
     #     self._sock.send_alert(data, address, **kwargs)
+
+    def close(self):
+        if self._sock:
+            self._sock.close()

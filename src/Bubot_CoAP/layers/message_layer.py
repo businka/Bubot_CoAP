@@ -270,6 +270,9 @@ class MessageLayer(object):
         :rtype : Transaction
         :return: the edited transaction
         """
+        if transaction.response is None:
+            transaction.completed = True
+            return
         logger.info("send_response - " + str(transaction.response))
         if transaction.response.type is None:
             if transaction.request.type == defines.Types["CON"] and not transaction.request.acknowledged:

@@ -92,6 +92,7 @@ class UdpCoapEndpoint(Endpoint):
         self._address = address
         self._family = socket.AF_INET
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._sock.bind(address)
         return self
 

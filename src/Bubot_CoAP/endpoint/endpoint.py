@@ -36,3 +36,9 @@ class Endpoint:
 
     def send(self, data, address):
         raise NotImplementedError()
+
+    def close(self):
+        raise NotImplementedError()
+
+    def __del__(self):
+        self.close()

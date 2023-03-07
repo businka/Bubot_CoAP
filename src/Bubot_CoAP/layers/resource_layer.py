@@ -436,13 +436,13 @@ class ResourceLayer(object):
             try:
                 method = getattr(transaction.resource, "render_GET_advanced", None)
                 ret = await method(request=transaction.request, response=transaction.response)
-                if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
-                        and isinstance(ret[0], Resource):
+                if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[0], Resource) \
+                        and (isinstance(ret[1], Response) or ret[1] is None):
                     # Advanced handler
                     resource, response = ret
                     transaction.resource = resource
                     transaction.response = response
-                    if transaction.response.code is None:
+                    if transaction.response and transaction.response.code is None:
                         transaction.response.code = defines.Codes.CONTENT.number
                     return transaction
                 elif isinstance(ret, tuple) and len(ret) == 3 and isinstance(ret[1], Response) \
