@@ -3,7 +3,9 @@ import socket
 import ssl
 
 from aio_dtls import DtlsSocket
+
 from .udp import UdpCoapEndpoint
+from ..coap_datagram_protocol import CoapDatagramProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +57,8 @@ class UdpCoapsEndpoint(UdpCoapEndpoint):
     def send(self, data, address, **kwargs):
         self._sock.sendto(data, address, **kwargs)
 
-    async def listen(self, server, protocol_factory):
-        await self._sock.listen(server, protocol_factory)
+    async def listen(self, server):
+        await self._sock.listen(server)
         if not self.address[1]:
             self._address = self.sock.address
         logger.debug(f'run {"multicast " if self._multicast else ""}'

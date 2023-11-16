@@ -1,7 +1,7 @@
 import logging
 from ..endpoint import Endpoint, supported_scheme
 from ..utils import parse_uri2
-from ..coap_protocol import CoapProtocol
+
 
 import socket
 
@@ -92,10 +92,20 @@ class EndpointLayer:
             address = (extract_ip6(), address[1])
             # await add_all_address(socket.AF_INET6, result)
         # else:
-        result += await endpoint.add(self, address, **kwargs)
+
+        multicast = kwargs.get('multicast', False)
+        epu = endpoint(**kwargs)
+        await epu.init_unicast(self._server, address)
+        if self.add(epu):
+            result.append(epu)
+        if multicast:
+            epm = endpoint(**kwargs)
+            await epm.init_multicast(self._server, address)
+            if self.add(epm):
+                result.append(epm)
         return result
 
-    async def add(self, endpoint: Endpoint):
+    def add(self, endpoint: Endpoint):
         """
         Handle add endpoint to server
 
@@ -106,7 +116,7 @@ class EndpointLayer:
         """
         scheme = endpoint.scheme
         family = endpoint.family
-        await endpoint.listen(self._server, CoapProtocol)
+        # await endpoint.listen(self._server)
         host, port = endpoint.address
         _endpoints = self._multicast_endpoints if endpoint.multicast else self._unicast_endpoints
         if scheme not in _endpoints:

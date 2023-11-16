@@ -1,20 +1,100 @@
+import ctypes
 import logging
 import struct
-import ctypes
 
+import cbor2
+
+from . import defines
+from .messages.message import Message
+from .messages.option import Option
 from .messages.request import Request
 from .messages.response import Response
-from .messages.option import Option
-from .import defines
-from .messages.message import Message
-import cbor2
+from .serializer import Serializer
 
 __author__ = 'Giacomo Tanganelli'
 
 logger = logging.getLogger(__name__)
 
 
-class Serializer(object):
+def _extract_message_size(data: bytes):
+    """Read out the full length of a CoAP messsage represented by data.
+
+    Returns None if data is too short to read the (full) length.
+
+    The number returned is the number of bytes that has to be read into data to
+    start reading the next message; it consists of a constant term, the token
+    length and the extended length of options-plus-payload."""
+
+    if not data:
+        return None
+
+    l = data[0] >> 4
+    tokenoffset = 2
+    tkl = data[0] & 0x0f
+
+    if l >= 13:
+        if l == 13:
+            extlen = 1
+            offset = 13
+        elif l == 14:
+            extlen = 2
+            offset = 269
+        else:
+            extlen = 4
+            offset = 65805
+        if len(data) < extlen + 1:
+            return None
+        tokenoffset = 2 + extlen
+        l = int.from_bytes(data[1:1 + extlen], "big") + offset
+    return tokenoffset, tkl, l
+
+
+def _decode_message(data: bytes) -> Message:
+    tokenoffset, tkl, _ = _extract_message_size(data)
+    if tkl > 8:
+        raise error.UnparsableMessage("Overly long token")
+    code = data[tokenoffset - 1]
+    token = data[tokenoffset:tokenoffset + tkl]
+
+    msg = Message(code=code, token=token)
+
+    msg.payload = msg.opt.decode(data[tokenoffset + tkl:])
+
+    return msg
+
+
+def _encode_length(l: int):
+    if l < 13:
+        return (l, b"")
+    elif l < 269:
+        return (13, (l - 13).to_bytes(1, 'big'))
+    elif l < 65805:
+        return (14, (l - 269).to_bytes(2, 'big'))
+    else:
+        return (15, (l - 65805).to_bytes(4, 'big'))
+
+
+def _serialize(msg: Message) -> bytes:
+    data = [msg.opt.encode()]
+    if msg.payload:
+        data += [b'\xff', msg.payload]
+    data = b"".join(data)
+    l, extlen = _encode_length(len(data))
+
+    tkl = len(msg.token)
+    if tkl > 8:
+        raise ValueError("Overly long token")
+
+    return b"".join((
+        bytes(((l << 4) | tkl,)),
+        extlen,
+        bytes((msg.code,)),
+        msg.token,
+        data
+    ))
+
+
+class SerializerTcp(Serializer):
     """
     Serializer class to serialize and deserialize CoAP message to/from udp streams.
     """
@@ -30,16 +110,22 @@ class Serializer(object):
         :rtype: Message
         """
         try:
-            fmt = "!BBH"
-            pos = struct.calcsize(fmt)
-            s = struct.Struct(fmt)
-            values = s.unpack_from(datagram)
-            first = values[0]
-            code = values[1]
-            mid = values[2]
-            version = (first & 0xC0) >> 6
-            message_type = (first & 0x30) >> 4
-            token_length = (first & 0x0F)
+            tokenoffset, tkl, _ = _extract_message_size(datagram)
+            if tkl > 8:
+                raise UnicodeDecodeError("Overly long token")
+            code = datagram[tokenoffset - 1]
+            token = datagram[tokenoffset:tokenoffset + tkl]
+
+            # fmt = "!BBH"
+            # pos = struct.calcsize(fmt)
+            # s = struct.Struct(fmt)
+            # values = s.unpack_from(datagram)
+            # first = values[0]
+            # code = values[1]
+            # mid = values[2]
+            # version = (first & 0xC0) >> 6
+            # message_type = (first & 0x30) >> 4
+            # token_length = (first & 0x0F)
             if Serializer.is_response(code):
                 message = Response()
                 message.code = code
@@ -48,19 +134,20 @@ class Serializer(object):
                 message.code = code
             else:
                 message = Message()
+                message.code = code
             message.source = source
             message.destination = None
-            message.version = version
-            message.type = message_type
-            message.mid = mid
-            if token_length > 0:
-                message.token = datagram[pos:pos + token_length]
-            else:
-                message.token = None
+            # message.version = version
+            # message.type = message_type
+            # message.mid = mid
+            # if token_length > 0:
+            #     message.token = datagram[pos:pos + token_length]
+            # else:
+            #     message.token = None
+            message.token = token
 
-            pos += token_length
             current_option = 0
-            values = datagram[pos:]
+            values = datagram[tokenoffset + tkl:]
             length_packet = len(values)
             pos = 0
             while pos < length_packet:
@@ -137,21 +224,22 @@ class Serializer(object):
         :return: the message serialized
         """
         fmt = "!BBH"
+        fmt = ""
+        # if message.token is None:
+        #     tkl = 0
+        # else:
+        #     tkl = len(message.token)
+        # tmp = (defines.VERSION << 2)
+        # tmp |= message.type
+        # tmp <<= 4
+        # tmp |= tkl
+        #
+        # values = [tmp, message.code, message.mid]
+        values = []
 
-        if message.token is None:
-            tkl = 0
-        else:
-            tkl = len(message.token)
-        tmp = (defines.VERSION << 2)
-        tmp |= message.type
-        tmp <<= 4
-        tmp |= tkl
-
-        values = [tmp, message.code, message.mid]
-
-        if message.token is not None and tkl > 0:
-            fmt += "%ss" % tkl
-            values.append(message.token)
+        # if message.token is not None and tkl > 0:
+        #     fmt += "%ss" % tkl
+        #     values.append(message.token)
 
         options = Serializer.as_sorted_list(message.options)  # already sorted
         lastoptionnumber = 0
@@ -244,6 +332,18 @@ class Serializer(object):
             logger.debug(values)
             logging.exception('Failed to pack structure')
 
+        l, extlen = _encode_length(len(datagram))
+        token = message.token if message.token else b''
+        tkl = len(token)
+        if tkl > 8:
+            raise ValueError("Overly long token")
+        datagram = b"".join((
+            bytes(((l << 4) | tkl,)),
+            extlen,
+            bytes((message.code,)),
+            token,
+            datagram
+            ))
         return datagram
 
     @staticmethod

@@ -2,8 +2,41 @@
 
 import collections
 import struct
+from enum import Enum
 
-__author__ = 'Giacomo Tanganelli'
+
+class RequestClassCode(Enum):
+    Method = 0
+    Success = 2
+    ClientError = 4
+    ServerError = 5
+    SignalingCodes = 7
+
+
+class RequestSuccessCode(Enum):
+    Created = 1
+    Deleted = 2
+    Valid = 3
+    Changed = 4
+    Content = 5
+    Continue = 31
+
+
+# class RequestServerErrorCode(Enum):
+#     Bad Request
+#     Unauthorized
+#     Bad Option
+#     Forbidden
+#     Not Found
+#     Method Not Allowed
+#     Not Acceptable
+#     Request Entity Incomplete
+#     Conflict
+#     Precondition Failed
+#     Request Entity Too Large
+#     Unsupported Content-Format
+#
+# class RequestClientErrorCode(Enum):
 
 """ CoAP Parameters """
 
@@ -11,7 +44,7 @@ ACK_TIMEOUT = 2  # standard 2
 
 SEPARATE_TIMEOUT = ACK_TIMEOUT / 2
 
-MULTICAST_TIMEOUT = 15
+MULTICAST_TIMEOUT = 35
 
 ACK_RANDOM_FACTOR = 1.5
 
@@ -108,33 +141,39 @@ class OptionRegistry(object):
     """
     All CoAP options. Every option is represented as: (NUMBER, NAME, VALUE_TYPE, REPEATABLE, DEFAULT)
     """
+
     def __init__(self):
         pass
 
-    RESERVED =      OptionItem(0, "Reserved",       UNKNOWN, True, None)
-    IF_MATCH =      OptionItem(1, "If-Match",       OPAQUE,  True, None)
-    URI_HOST =      OptionItem(3, "Uri-Host",       STRING,  True, None)
-    ETAG =          OptionItem(4, "ETag",           OPAQUE,  True, None)
-    IF_NONE_MATCH = OptionItem(5, "If-None-Match",  OPAQUE, False, None)
-    OBSERVE =       OptionItem(6, "Observe",        INTEGER, False, 0)
-    URI_PORT =      OptionItem(7, "Uri-Port",       INTEGER, False, 5683)
-    LOCATION_PATH = OptionItem(8, "Location-Path",  STRING,  True, None)
-    URI_PATH =      OptionItem(11, "Uri-Path",      STRING,  True, None)
-    CONTENT_TYPE =  OptionItem(12, "Content-Type",  INTEGER, False, 0)
-    MAX_AGE =       OptionItem(14, "Max-Age",       INTEGER, False, 60)
-    URI_QUERY =     OptionItem(15, "Uri-Query",     STRING,  True, None)
-    ACCEPT =        OptionItem(17, "Accept",        INTEGER, False, 0)
-    LOCATION_QUERY = OptionItem(20,"Location-Query",STRING,  True, None)
-    BLOCK2 =        OptionItem(23, "Block2",        INTEGER, False, None)
-    BLOCK1 =        OptionItem(27, "Block1",        INTEGER, False, None)
-    SIZE2 =         OptionItem(28, "Size2",         INTEGER, False, 0)
-    PROXY_URI =     OptionItem(35, "Proxy-Uri",     STRING,  False, None)
-    PROXY_SCHEME =  OptionItem(39, "Proxy-Schema",  STRING,  False, None)
-    SIZE1 =         OptionItem(60, "Size1",         INTEGER, False, None)
-    NO_RESPONSE =   OptionItem(258, "No-Response",  INTEGER, False, None)
-    OCF_ACCEPT_CONTENT_FORMAT_VERSION = OptionItem(2049, "OCF-Accept-Content-Format-Version",  INTEGER, False, None)
-    OCF_CONTENT_FORMAT_VERSION        = OptionItem(2053, "OCF-Content-Format-Version",  INTEGER, False, None)
+    RESERVED = OptionItem(0, "Reserved", UNKNOWN, True, None)
+    IF_MATCH = OptionItem(1, "If-Match", OPAQUE, True, None)
+    URI_HOST = OptionItem(3, "Uri-Host", STRING, True, None)
+    ETAG = OptionItem(4, "ETag", OPAQUE, True, None)
+    IF_NONE_MATCH = OptionItem(5, "If-None-Match", OPAQUE, False, None)
+    OBSERVE = OptionItem(6, "Observe", INTEGER, False, 0)
+    URI_PORT = OptionItem(7, "Uri-Port", INTEGER, False, 5683)
+    LOCATION_PATH = OptionItem(8, "Location-Path", STRING, True, None)
+    URI_PATH = OptionItem(11, "Uri-Path", STRING, True, None)
+    CONTENT_TYPE = OptionItem(12, "Content-Type", INTEGER, False, 0)
+    MAX_AGE = OptionItem(14, "Max-Age", INTEGER, False, 60)
+    URI_QUERY = OptionItem(15, "Uri-Query", STRING, True, None)
+    ACCEPT = OptionItem(17, "Accept", INTEGER, False, 0)
+    LOCATION_QUERY = OptionItem(20, "Location-Query", STRING, True, None)
+    BLOCK2 = OptionItem(23, "Block2", INTEGER, False, None)
+    BLOCK1 = OptionItem(27, "Block1", INTEGER, False, None)
+    SIZE2 = OptionItem(28, "Size2", INTEGER, False, 0)
+    PROXY_URI = OptionItem(35, "Proxy-Uri", STRING, False, None)
+    PROXY_SCHEME = OptionItem(39, "Proxy-Schema", STRING, False, None)
+    SIZE1 = OptionItem(60, "Size1", INTEGER, False, None)
+    NO_RESPONSE = OptionItem(258, "No-Response", INTEGER, False, None)
     RM_MESSAGE_SWITCHING = OptionItem(65524, "Routing", OPAQUE, False, None)
+
+    OCF_ACCEPT_CONTENT_FORMAT_VERSION = OptionItem(2049, "OCF-Accept-Content-Format-Version", INTEGER, False, None)
+    OCF_CONTENT_FORMAT_VERSION = OptionItem(2053, "OCF-Content-Format-Version", INTEGER, False, None)
+
+    # RFC8323 TCP/TLS/WebSockets Transports for CoAP
+    MAX_MESSAGE_SIZE = OptionItem(2, "Max-Message-Size", INTEGER, False, 1152)
+    BLOCK_WISE_TRANSFER = OptionItem(4, "Block-Wise-Transfer", INTEGER, False, 0)
 
     LIST = {
         0: RESERVED,
@@ -160,8 +199,9 @@ class OptionRegistry(object):
         258: NO_RESPONSE,
         2049: OCF_ACCEPT_CONTENT_FORMAT_VERSION,
         2053: OCF_CONTENT_FORMAT_VERSION,
-        65524: RM_MESSAGE_SWITCHING
+        65524: RM_MESSAGE_SWITCHING,
 
+        2: MAX_MESSAGE_SIZE
     }
 
     @staticmethod
@@ -186,6 +226,7 @@ class OptionRegistry(object):
         nocache = ((opt_bytes[0] & 0x1e) == 0x1c)
         return (critical, unsafe, nocache)
 
+
 Types = {
     'CON': 0,
     'NON': 1,
@@ -193,6 +234,15 @@ Types = {
     'RST': 3,
     'None': None
 }
+
+
+class MsgType(Enum):
+    CON = 0
+    NON = 1
+    ACK = 2
+    RST = 3
+    NONE = None
+
 
 CodeItem = collections.namedtuple('CodeItem', 'number name')
 
@@ -233,6 +283,13 @@ class Codes(object):
     GATEWAY_TIMEOUT = CodeItem(164, 'GATEWAY_TIMEOUT')
     PROXY_NOT_SUPPORTED = CodeItem(165, 'PROXY_NOT_SUPPORTED')
 
+    # RFC8323 TCP/TLS/WebSockets Transports for CoAP
+    CSM = CodeItem(225, 'CSM')
+    PING = CodeItem(226, 'PING')
+    PONG = CodeItem(227, 'PONG')
+    RELEASE = CodeItem(228, 'RELEASE')
+    ABORT = CodeItem(229, 'ABORT')
+
     LIST = {
         0: EMPTY,
         1: GET,
@@ -262,9 +319,24 @@ class Codes(object):
         162: BAD_GATEWAY,
         163: SERVICE_UNAVAILABLE,
         164: GATEWAY_TIMEOUT,
-        165: PROXY_NOT_SUPPORTED
+        165: PROXY_NOT_SUPPORTED,
+
+        225: CSM,
+        226: PING,
+        227: PONG,
+        228: RELEASE,
+        229: ABORT
 
     }
+
+    @staticmethod
+    def class_code(code):
+        return int(f'{code:08b}'[:3], 2)
+
+    @classmethod
+    def is_error(cls, code):
+        class_code = cls.class_code(code)
+        return class_code in [4, 5]
 
 
 Content_types = {
@@ -276,47 +348,47 @@ Content_types = {
     "application/json": 50,
     "application/cbor": 60,
     "application/vnd.ocf+cbor": 10000
-#                 0: 'text/plain;charset=utf-8',
-#                16: 'application/cose;cose-type="cose-encrypt0"',
-#                17: 'application/cose;cose-type="cose-mac0"',
-#                18: 'application/cose;cose-type="cose-sign1"',
-#                40: 'application/link-format',
-#                41: 'application/xml',
-#                42: 'application/octet-stream',
-#                47: 'application/exi',
-#                50: 'application/json',
-#                51: 'application/json-patch+json',
-#                52: 'application/merge-patch+json',
-#                60: 'application/cbor',
-#                61: 'application/cwt',
-#                62: 'application/multipast-core', # draft-ietf-core-multipart-ct
-#                64: 'application/link-format+cbor', # draft-ietf-core-links-json-10
-#                70: 'application/oscon', # draft-ietf-core-object-security-01
-#                96: 'application/cose;cose-type="cose-encrypt"',
-#                97: 'application/cose;cose-type="cose-mac"',
-#                98: 'application/cose;cose-type="cose-sign"',
-#                101: 'application/cose-key',
-#                102: 'application/cose-key-set',
-#                110: 'application/senml+json',
-#                111: 'application/sensml+json',
-#                112: 'application/senml+cbor',
-#                113: 'application/sensml+cbor',
-#                114: 'application/senml-exi',
-#                115: 'application/sensml-exi',
-#                256: 'application/coap-group+json',
-#                280: 'application/pkcs7-mime;smime-type=server-generated-key',
-#                281: 'application/pkcs7-mime;smime-type=certs-only',
-#                282: 'application/pkcs7-mime;smime-type=CMC-Request',
-#                283: 'application/pkcs7-mime;smime-type=CMC-Response',
-#                284: 'application/pkcs8',
-#                285: 'application/csrattrs',
-#                286: 'application/pkcs10',
-#                310: 'application/senml+xml',
-#                311: 'application/sensml+xml',
-#                1000: 'application/vnd.ocf+cbor',
-#                11542: 'application/vnd.oma.lwm2m+tlv',
-#                11543: 'application/vnd.oma.lwm2m+json',
-#                504: 'application/link-format+json', # draft-ietf-core-links-json-10
+    #                 0: 'text/plain;charset=utf-8',
+    #                16: 'application/cose;cose-type="cose-encrypt0"',
+    #                17: 'application/cose;cose-type="cose-mac0"',
+    #                18: 'application/cose;cose-type="cose-sign1"',
+    #                40: 'application/link-format',
+    #                41: 'application/xml',
+    #                42: 'application/octet-stream',
+    #                47: 'application/exi',
+    #                50: 'application/json',
+    #                51: 'application/json-patch+json',
+    #                52: 'application/merge-patch+json',
+    #                60: 'application/cbor',
+    #                61: 'application/cwt',
+    #                62: 'application/multipast-core', # draft-ietf-core-multipart-ct
+    #                64: 'application/link-format+cbor', # draft-ietf-core-links-json-10
+    #                70: 'application/oscon', # draft-ietf-core-object-security-01
+    #                96: 'application/cose;cose-type="cose-encrypt"',
+    #                97: 'application/cose;cose-type="cose-mac"',
+    #                98: 'application/cose;cose-type="cose-sign"',
+    #                101: 'application/cose-key',
+    #                102: 'application/cose-key-set',
+    #                110: 'application/senml+json',
+    #                111: 'application/sensml+json',
+    #                112: 'application/senml+cbor',
+    #                113: 'application/sensml+cbor',
+    #                114: 'application/senml-exi',
+    #                115: 'application/sensml-exi',
+    #                256: 'application/coap-group+json',
+    #                280: 'application/pkcs7-mime;smime-type=server-generated-key',
+    #                281: 'application/pkcs7-mime;smime-type=certs-only',
+    #                282: 'application/pkcs7-mime;smime-type=CMC-Request',
+    #                283: 'application/pkcs7-mime;smime-type=CMC-Response',
+    #                284: 'application/pkcs8',
+    #                285: 'application/csrattrs',
+    #                286: 'application/pkcs10',
+    #                310: 'application/senml+xml',
+    #                311: 'application/sensml+xml',
+    #                1000: 'application/vnd.ocf+cbor',
+    #                11542: 'application/vnd.oma.lwm2m+tlv',
+    #                11543: 'application/vnd.oma.lwm2m+json',
+    #                504: 'application/link-format+json', # draft-ietf-core-links-json-10
 }
 
 COAP_PREFACE = "coap://"
@@ -349,5 +421,4 @@ CoAP_HTTP = {
     "SERVICE_UNAVAILABLE": "503",
     "GATEWAY_TIMEOUT": "504",
     "PROXY_NOT_SUPPORTED": "502"
-
 }

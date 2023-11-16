@@ -1,9 +1,11 @@
 import asyncio
 import logging
+
+from bubot_helpers.ExtException import ExtException
 from ..messages.request import Request
 from ..messages.response import Response
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('Bubot_CoAP')
 from ..defines import MULTICAST_TIMEOUT
 
 
@@ -14,22 +16,28 @@ class CallbackLayer:
 
     async def wait(self, request: Request, *, timeout=None, **kwargs):
         # timeout = kwargs.get('timeout')
-        if not timeout:
-            timeout = MULTICAST_TIMEOUT
-        waiter = Waiter(request, **kwargs)
-        self._waited_answer[waiter.key] = waiter
         try:
-            return await asyncio.wait_for(waiter.future, timeout)
-        except asyncio.CancelledError:
-            waiter.future.set_exception(asyncio.CancelledError())
-        except asyncio.TimeoutError:
-            if request.multicast:
-                return waiter.result
-            else:
-                raise asyncio.TimeoutError()
-        finally:
-            self._waited_answer.pop(waiter.key, None)
-        pass
+            if not timeout:
+                timeout = MULTICAST_TIMEOUT
+            waiter = Waiter(request, **kwargs)
+            self._waited_answer[waiter.key] = waiter
+            try:
+                result = await asyncio.wait_for(waiter.future, timeout)
+                return result
+            except (asyncio.TimeoutError, asyncio.CancelledError) as err:
+                if request.multicast:
+                    return waiter.result
+                else:
+                    raise err
+            except Exception as err:
+                raise err
+            finally:
+                self._waited_answer.pop(waiter.key, None)
+            pass
+        except (asyncio.TimeoutError, asyncio.CancelledError) as err:
+            raise err
+        except Exception as err:
+            raise ExtException(parent=err)
 
     def set_result(self, response: Response):
         try:
@@ -40,6 +48,12 @@ class CallbackLayer:
         logger.debug(f'return_response - {response}')
         waiter.future = response
         pass
+
+    def cancel_waited(self, exception):
+        for key in list(self._waited_answer.keys()):
+            waiter = self._waited_answer.pop(key, None)
+            if not waiter.future.done():
+                waiter.future.set_exception(exception)
 
 
 class Waiter:

@@ -8,13 +8,14 @@ from .messages.option import Option
 from .import defines
 from .messages.message import Message
 import cbor2
+from .serializer import Serializer
 
 __author__ = 'Giacomo Tanganelli'
 
 logger = logging.getLogger(__name__)
 
 
-class Serializer(object):
+class SerializerUdp(Serializer):
     """
     Serializer class to serialize and deserialize CoAP message to/from udp streams.
     """

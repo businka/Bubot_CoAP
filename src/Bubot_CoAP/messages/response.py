@@ -9,6 +9,7 @@ class Response(Message):
     """
     Class to handle the Responses.
     """
+
     @property
     def location_path(self):
         """
@@ -130,3 +131,6 @@ class Response(Message):
         self.scheme = request.scheme
         self.token = request.token
         return self
+
+    def is_error(self):
+        return defines.Codes.is_error(self.code)

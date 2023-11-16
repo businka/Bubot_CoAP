@@ -1,10 +1,11 @@
 import logging
+import time
 
 from ..defines import Codes
 
 __author__ = 'Emilio Vallati'
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('Bubot_CoAP')
 
 
 class CacheLayer(object):

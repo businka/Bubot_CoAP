@@ -5,7 +5,7 @@ from .. import utils
 from ..messages.request import Request
 from ..messages.response import Response
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('Bubot_CoAP')
 
 __author__ = 'Giacomo Tanganelli'
 

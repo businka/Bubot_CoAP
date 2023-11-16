@@ -6,7 +6,7 @@ from .. import utils
 
 __author__ = 'Giacomo Tanganelli'
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('Bubot_CoAP')
 
 
 class ObserveItem(object):

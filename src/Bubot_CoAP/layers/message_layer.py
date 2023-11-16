@@ -1,18 +1,19 @@
 import logging
 import random
-import time
 import socket
+import time
 
-from .. import utils
 from .. import defines
+from .. import utils
 from ..messages.request import Request
 from ..transaction import Transaction
 from ..utils import generate_random_token
+
 # import asyncio
 
 __author__ = 'Giacomo Tanganelli'
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('Bubot_CoAP')
 
 
 class MessageLayer(object):
@@ -60,13 +61,13 @@ class MessageLayer(object):
         for k in list(self._transactions.keys()):
             now = time.time()
             transaction = self._transactions[k]
-            if transaction.timestamp + timeout_time < now:
+            if transaction.timestamp + timeout_time < now or transaction.completed:
                 logger.debug("Delete transaction")
                 del self._transactions[k]
         for k in list(self._transactions_token.keys()):
             now = time.time()
             transaction = self._transactions_token[k]
-            if transaction.timestamp + timeout_time < now:
+            if transaction.timestamp + timeout_time < now or transaction.completed:
                 logger.debug("Delete transaction")
                 del self._transactions_token[k]
                 self.server.block_layer.purge(k)
@@ -80,7 +81,7 @@ class MessageLayer(object):
         :rtype : Transaction
         :return: the edited transaction
         """
-        logger.info("receive_request - " + str(request))
+        logger.info("Receive request  - " + str(request))
         try:
             host, port = request.source
         except AttributeError:
@@ -129,7 +130,7 @@ class MessageLayer(object):
         :rtype : Transaction
         :return: the transaction to which the response belongs to
         """
-        logger.info("receive_response - " + str(response))
+        logger.info("Receive response - " + str(response))
         try:
             host, port = response.source
         except AttributeError:
@@ -139,7 +140,7 @@ class MessageLayer(object):
         # key_mid_multicast = utils.str_append_hash(all_coap_nodes, port, response.mid)
         key_token = utils.str_append_hash(host, port, response.token)
         key_token_multicast = utils.str_append_hash(response.destination[0], response.destination[1], response.token)
-        if key_mid in list(self._transactions_sent.keys()):
+        if response.type in [defines.Types["ACK"], defines.Types["RST"]] and key_mid in list(self._transactions_sent.keys()):
             transaction = self._transactions_sent[key_mid]
             if response.token != transaction.request.token:
                 logger.warning("Tokens does not match -  response message " + str(host) + ":" + str(port))
@@ -235,7 +236,6 @@ class MessageLayer(object):
             host, port = request.destination
         except AttributeError:
             return
-
         request.timestamp = time.time()
         transaction = Transaction(request=request, timestamp=request.timestamp)
         if transaction.request.type is None:
@@ -273,7 +273,6 @@ class MessageLayer(object):
         if transaction.response is None:
             transaction.completed = True
             return
-        logger.info("send_response - " + str(transaction.response))
         if transaction.response.type is None:
             if transaction.request.type == defines.Types["CON"] and not transaction.request.acknowledged:
                 transaction.response.type = defines.Types["ACK"]
@@ -296,6 +295,7 @@ class MessageLayer(object):
             self._transactions[key_mid] = transaction
 
         transaction.request.acknowledged = True
+        logger.info("Send response    - " + str(transaction.response))
         return transaction
 
     def send_empty(self, transaction, related, message):

@@ -1,27 +1,27 @@
-import logging
 import asyncio
+import logging
 import random
 from socket import AF_INET, AF_INET6
 
-from .import defines
+from aio_dtls.connection_manager.connection_manager import ConnectionManager
+
+from bubot_helpers.ExtException import ExtException
+from . import defines
 from .layers.block_layer import BlockLayer
+from .layers.callback_layer import CallbackLayer
+from .layers.endpoint_layer import EndpointLayer
 from .layers.message_layer import MessageLayer
 from .layers.observe_layer import ObserveLayer
 from .layers.request_layer import RequestLayer
 from .layers.resource_layer import ResourceLayer
-from .layers.callback_layer import CallbackLayer
 from .messages.message import Message
 from .messages.request import Request
 from .resources.resource import Resource
-from .serializer import Serializer
+from .serializer_udp import Serializer
 from .utils import Tree, Timer
-from .layers.endpoint_layer import EndpointLayer
-
-from aio_dtls.connection_manager.connection_manager import ConnectionManager
 
 __author__ = 'Giacomo Tanganelli'
-print(__name__)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('Bubot_CoAP')
 
 
 class Server:
@@ -68,12 +68,12 @@ class Server:
 
     async def purge(self):
         """
-        Clean old transactions
+        Clean old and complete transactions
 
         """
         while not self.stopped.is_set():
             try:
-                await asyncio.wait_for(self.stopped.wait(), defines.EXCHANGE_LIFETIME)
+                await asyncio.wait_for(self.stopped.wait(), 15)  # defines.EXCHANGE_LIFETIME)
             except asyncio.TimeoutError:
                 pass
             self.message_layer.purge()
@@ -83,12 +83,15 @@ class Server:
         Stop the server.
 
         """
-        logger.info("Stop server")
-        self.stopped.set()
-        for event in self.to_be_stopped:
-            event.set()
-        await asyncio.sleep(0.001)
-        self.endpoint_layer.close()
+        try:
+            logger.info("Stop server")
+            self.stopped.set()
+            for event in self.to_be_stopped:
+                event.set()
+            await asyncio.sleep(0.001)
+            self.endpoint_layer.close()
+        except Exception as err:
+            raise ExtException(parent=err, action='coap server closing')
 
     async def receive_request(self, transaction):
         """
@@ -106,7 +109,7 @@ class Server:
             if transaction.block_transfer:
                 await self._stop_separate_timer(transaction.separate_timer)
                 self.message_layer.send_response(transaction)
-                self.send_datagram(transaction.response)
+                await self.send_datagram(transaction.response)
                 return
 
             await self.observe_layer.receive_request(transaction)
@@ -134,47 +137,61 @@ class Server:
                 if transaction.request.multicast:
                     await asyncio.sleep(random.uniform(0, 10))
                     transaction.response.source = (transaction.response.source[0], None)
-                self.send_datagram(transaction.response)
+                await self.send_datagram(transaction.response)
+        await asyncio.sleep(0)
 
     async def send_message(self, message, no_response=False, **kwargs):
-        if isinstance(message, Request):
-            request = self.request_layer.send_request(message)
-            request = self.observe_layer.send_request(request)
-            request = self.block_layer.send_request(request)
-            if no_response:
-                # don't add the send message to the message layer transactions
-                logger.debug(f'Send no response request {request}')
-                self.send_datagram(request, **kwargs)
-                return
-            transaction = self.message_layer.send_request(request)
-            self.send_datagram(transaction.request, **kwargs)
-            if transaction.request.type == defines.Types["CON"]:
-                await self.start_retransmission(transaction, transaction.request)
-            return await self.callback_layer.wait(request, **kwargs)
-        elif isinstance(message, Message):
-            message = self.observe_layer.send_empty(message)
-            message = self.message_layer.send_empty(None, None, message)
-            self.send_datagram(message, **kwargs)
+        try:
+            if isinstance(message, Request):
+                request = self.request_layer.send_request(message)
+                request = self.observe_layer.send_request(request)
+                request = self.block_layer.send_request(request)
+                if no_response:
+                    # don't add the send message to the message layer transactions
+                    await self.send_datagram(request, **kwargs)
+                    logger.debug(f'Send no response request {request}')
+                    return
+                transaction = self.message_layer.send_request(request)
+                await self.send_datagram(transaction.request, **kwargs)
+                logger.info("Send request     - " + str(request))
 
-    def send_datagram(self, message, **kwargs):
+                if transaction.request.type == defines.Types["CON"]:
+                    await self.start_retransmission(transaction, transaction.request)
+                response = await self.callback_layer.wait(request, **kwargs)
+                return response
+
+            elif isinstance(message, Message):
+                message = self.observe_layer.send_empty(message)
+                message = self.message_layer.send_empty(None, None, message)
+                await self.send_datagram(message, **kwargs)
+        except (asyncio.TimeoutError, asyncio.CancelledError) as err:
+            raise err
+        except Exception as err:
+            raise ExtException(parent=err)
+
+    async def send_datagram(self, message, **kwargs):
         """
         Send a message through the udp socket.
 
         :type message: Message
         :param message: the message to send
         """
-        # if not self.stopped.isSet():
-        # host, port = message.destination
-        # host, port = message.source
-        endpoint = self.endpoint_layer.find_sending_endpoint(message)
-        if not endpoint:
-            raise KeyError(f'endpoint for {message.source}')
-        message.source = endpoint.address
-        logger.info(f"send datagram {message}")
-        serializer = Serializer()
-        raw_message = serializer.serialize(message)
+        try:
+            # if not self.stopped.isSet():
+            # host, port = message.destination
+            # host, port = message.source
+            endpoint = self.endpoint_layer.find_sending_endpoint(message)
+            if not endpoint:
+                raise KeyError(f'endpoint for {message.source}')
+            async with endpoint.lock:
+                message.source = endpoint.address
+                logger.debug(f"send datagram {message}")
+                serializer = Serializer()
+                raw_message = serializer.serialize(message)
 
-        endpoint.send(bytes(raw_message), message.destination, **kwargs)
+                endpoint.send(bytes(raw_message), message.destination, **kwargs)
+        except Exception as err:
+            raise err
 
     def add_resource(self, path, resource):
         """
@@ -261,7 +278,7 @@ class Server:
         transaction = self.message_layer.send_request(transaction.request)
         # ... but don't forget to reset the acknowledge flag
         transaction.request.acknowledged = False
-        self.send_datagram(transaction.request)
+        await self.send_datagram(transaction.request)
         if transaction.request.type == defines.Types["CON"]:
             await self.start_retransmission(transaction, transaction.request)
 
@@ -306,7 +323,7 @@ class Server:
                     future_time *= 2
                     if retransmit_count < defines.MAX_RETRANSMIT:
                         logger.debug("retransmit loop ... retransmit Request")
-                        self.send_datagram(message)
+                        await self.send_datagram(message)
 
             if message.acknowledged or message.rejected:
                 message.timeouted = False
@@ -363,7 +380,7 @@ class Server:
             if not message.acknowledged and message.type == defines.Types["CON"]:
                 ack = self.message_layer.send_empty(transaction, message, ack)
                 if ack.type is not None and ack.mid is not None:
-                    self.send_datagram(ack)
+                    await self.send_datagram(ack)
 
     async def notify(self, resource):
         """
@@ -384,4 +401,4 @@ class Server:
                     if transaction.response.type == defines.Types["CON"]:
                         await self.start_retransmission(transaction, transaction.response)
 
-                    self.send_datagram(transaction.response)
+                    await self.send_datagram(transaction.response)

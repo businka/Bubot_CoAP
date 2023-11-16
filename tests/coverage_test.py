@@ -13,7 +13,7 @@ from Bubot_CoAP.messages.message import Message
 from Bubot_CoAP.messages.option import Option
 from Bubot_CoAP.messages.request import Request
 from Bubot_CoAP.messages.response import Response
-from Bubot_CoAP.serializer import Serializer
+from Bubot_CoAP.serializer_udp import Serializer
 
 from tests.exampleresources import BasicResource, Long, Separate, Storage, Big, voidResource, XMLResource, ETAGResource, \
     Child, \

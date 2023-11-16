@@ -299,10 +299,11 @@ class Message(object):
         :param value: (ip, port)
         :raise AttributeError: if value is not a ip and a port.
         """
-        if value is not None and (not isinstance(value, tuple) or len(value)) != 2:
-            raise AttributeError
+        if value is not None and (not isinstance(value, (tuple, list)) or len(value)) != 2:
+            raise AttributeError('message destination')
         if value:
             self._family = socket.getaddrinfo(value[0], None)[0][0]
+            value = (value[0], value[1])
         self._destination = value
 
     @property
