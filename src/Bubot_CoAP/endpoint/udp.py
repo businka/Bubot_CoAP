@@ -3,10 +3,11 @@ __author__ = 'Mikhail Razgovorov'
 import logging
 import socket
 import struct
-
+from ..utils import calc_family_by_address
 from .endpoint import Endpoint
+from ..coap_udp_protocol import CoapDatagramProtocol
 from ..defines import ALL_COAP_NODES, ALL_COAP_NODES_IPV6, COAP_DEFAULT_PORT
-from ..coap_datagram_protocol import CoapDatagramProtocol
+from ..serializer_udp import SerializerUdp
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class UdpCoapEndpoint(Endpoint):
     Class to handle the EndPoint.
     """
     scheme = 'coap'
+    serializer = SerializerUdp
 
     def __init__(self, **kwargs):
         """
@@ -60,16 +62,15 @@ class UdpCoapEndpoint(Endpoint):
         self._sock = sock
         return self
 
-
     def send(self, data, address, **kwargs):
         self._sock.sendto(data, address)
 
     def _init_unicast(self, address):
-        self.calc_family_by_address(address)
+        self._family, self._address = calc_family_by_address(address)
         if self._family == socket.AF_INET:  # IPv4
-            return self.init_unicast_ip4_by_address(address, **self.params)
+            self.init_unicast_ip4_by_address(address, **self.params)
         elif self._family == socket.AF_INET6:  # IPv6
-            return self.init_unicast_ip6_by_address(address, **self.params)
+            self.init_unicast_ip6_by_address(address, **self.params)
 
     async def init_unicast(self, server, address):
         try:
@@ -82,7 +83,7 @@ class UdpCoapEndpoint(Endpoint):
         ...
 
     async def init_multicast(self, server, address):
-        self.calc_family_by_address(address)
+        self._family, self._address = calc_family_by_address(address)
         if self._family == socket.AF_INET:  # IPv4
             self.init_multicast_ip4_by_address(address, **self.params)
         elif self._family == socket.AF_INET6:  # IPv6
@@ -98,7 +99,6 @@ class UdpCoapEndpoint(Endpoint):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._sock.bind(address)
-        return self
 
     def init_unicast_ip6_by_address(self, address, **kwargs):
         self._multicast = None
@@ -171,6 +171,8 @@ class UdpCoapEndpoint(Endpoint):
     def close(self):
         if self._transport:
             self._transport.close()
+        if self._sock:
+            self._sock.close()
 
     async def restart_transport(self, server):
         async with self.lock:

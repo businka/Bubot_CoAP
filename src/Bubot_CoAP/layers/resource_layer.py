@@ -36,87 +36,84 @@ class ResourceLayer(object):
                 return transaction
 
         method = getattr(resource_node, "render_POST", None)
-        try:
-            resource = await method(request=transaction.request)
-        except NotImplementedError:
-            try:
-                method = getattr(resource_node, "render_POST_advanced", None)
-                ret = await method(request=transaction.request, response=transaction.response)
-                if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
-                        and isinstance(ret[0], Resource):
-                    # Advanced handler
-                    resource, response = ret
-                    resource.changed = True
-                    resource.observe_count += 1
-                    transaction.resource = resource
-                    transaction.response = response
-                    if transaction.response.code is None:
-                        transaction.response.code = defines.Codes.CREATED.number
-                    return transaction
-                elif isinstance(ret, tuple) and len(ret) == 3 and isinstance(ret[1], Response) \
-                        and isinstance(ret[0], Resource):
-                    # Advanced handler separate
-                    resource, response, callback = ret
-                    ret = await self._handle_separate_advanced(transaction, callback)
-                    if not isinstance(ret, tuple) or \
-                            not (isinstance(ret[0], Resource) and isinstance(ret[1], Response)):  # pragma: no cover
-                        transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
-                        return transaction
-                    resource, response = ret
-                    resource.changed = True
-                    resource.observe_count += 1
-                    transaction.resource = resource
-                    transaction.response = response
-                    if transaction.response.code is None:
-                        transaction.response.code = defines.Codes.CREATED.number
-                    return transaction
-                else:
-                    raise NotImplementedError
-            except NotImplementedError:
-                transaction.response.code = defines.Codes.METHOD_NOT_ALLOWED.number
-                return transaction
 
-        if isinstance(resource, Resource):
-            pass
-        elif isinstance(resource, tuple) and len(resource) == 2:
-            resource, callback = resource
-            resource = await self._handle_separate(transaction, callback)
-            if not isinstance(resource, Resource):  # pragma: no cover
-                transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+        try:
+            ret = await method(request=transaction.request, response=transaction.response)
+            if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
+                    and isinstance(ret[0], Resource):
+                # Advanced handler
+                resource, response = ret
+                resource.changed = True
+                resource.observe_count += 1
+                transaction.resource = resource
+                transaction.response = response
+                if transaction.response.code is None:
+                    transaction.response.code = defines.Codes.CREATED.number
                 return transaction
-        else:  # pragma: no cover
-            # Handle error
-            transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+            elif isinstance(ret, tuple) and len(ret) == 3 and isinstance(ret[1], Response) \
+                    and isinstance(ret[0], Resource):
+                # Advanced handler separate
+                resource, response, callback = ret
+                ret = await self._handle_separate_advanced(transaction, callback)
+                if not isinstance(ret, tuple) or \
+                        not (isinstance(ret[0], Resource) and isinstance(ret[1], Response)):  # pragma: no cover
+                    transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+                    return transaction
+                resource, response = ret
+                resource.changed = True
+                resource.observe_count += 1
+                transaction.resource = resource
+                transaction.response = response
+                if transaction.response.code is None:
+                    transaction.response.code = defines.Codes.CREATED.number
+                return transaction
+            else:
+                raise NotImplementedError
+        except NotImplementedError:
+            transaction.response.code = defines.Codes.METHOD_NOT_ALLOWED.number
             return transaction
 
-        if resource.path is None:
-            resource.path = path
-        resource.observe_count = resource_node.observe_count
-
-        if resource is resource_node:
-            transaction.response.code = defines.Codes.CHANGED.number
-        else:
-            transaction.response.code = defines.Codes.CREATED.number
-        resource.changed = True
-        resource.observe_count += 1
-        transaction.resource = resource
-
-        assert(isinstance(resource, Resource))
-        if resource.etag is not None:
-            transaction.response.etag = resource.etag
-
-        if transaction.response.code == defines.Codes.CREATED.number:
-            # Only on CREATED according to RFC 7252 Chapter 5.8.2 POST
-            transaction.response.location_path = resource.path
-
-            if resource.location_query is not None and len(resource.location_query) > 0:
-                transaction.response.location_query = resource.location_query
-
-        transaction.response.payload = None
-
-        self._parent.root[resource.path] = resource
-
-        return transaction
+        # if isinstance(resource, Resource):
+        #     pass
+        # elif isinstance(resource, tuple) and len(resource) == 2:
+        #     resource, callback = resource
+        #     resource = await self._handle_separate(transaction, callback)
+        #     if not isinstance(resource, Resource):  # pragma: no cover
+        #         transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+        #         return transaction
+        # else:  # pragma: no cover
+        #     # Handle error
+        #     transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+        #     return transaction
+        #
+        # if resource.path is None:
+        #     resource.path = path
+        # resource.observe_count = resource_node.observe_count
+        #
+        # if resource is resource_node:
+        #     transaction.response.code = defines.Codes.CHANGED.number
+        # else:
+        #     transaction.response.code = defines.Codes.CREATED.number
+        # resource.changed = True
+        # resource.observe_count += 1
+        # transaction.resource = resource
+        #
+        # assert(isinstance(resource, Resource))
+        # if resource.etag is not None:
+        #     transaction.response.etag = resource.etag
+        #
+        # if transaction.response.code == defines.Codes.CREATED.number:
+        #     # Only on CREATED according to RFC 7252 Chapter 5.8.2 POST
+        #     transaction.response.location_path = resource.path
+        #
+        #     if resource.location_query is not None and len(resource.location_query) > 0:
+        #         transaction.response.location_query = resource.location_query
+        #
+        # transaction.response.payload = None
+        #
+        # self._parent.root[resource.path] = resource
+        #
+        # return transaction
 
     async def add_resource(self, transaction, parent_resource, lp):
         """
@@ -129,85 +126,81 @@ class ResourceLayer(object):
         """
         method = getattr(parent_resource, "render_POST", None)
         try:
-            resource = await method(request=transaction.request)
+            ret = method(request=transaction.request, response=transaction.response)
+            if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
+                    and isinstance(ret[0], Resource):
+                # Advanced handler
+                resource, response = ret
+                resource.path = lp
+                resource.changed = True
+                self._parent.root[resource.path] = resource
+                transaction.resource = resource
+                transaction.response = response
+                if transaction.response.code is None:
+                    transaction.response.code = defines.Codes.CREATED.number
+                return transaction
+            elif isinstance(ret, tuple) and len(ret) == 3 and isinstance(ret[1], Response) \
+                    and isinstance(ret[0], Resource):
+                # Advanced handler separate
+                resource, response, callback = ret
+                ret = await self._handle_separate_advanced(transaction, callback)
+                if not isinstance(ret, tuple) or \
+                        not (isinstance(ret[0], Resource) and isinstance(ret[1], Response)):  # pragma: no cover
+                    transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+                    return transaction
+                resource, response = ret
+                resource.path = lp
+                resource.changed = True
+                self._parent.root[resource.path] = resource
+                transaction.resource = resource
+                transaction.response = response
+                if transaction.response.code is None:
+                    transaction.response.code = defines.Codes.CREATED.number
+                return transaction
+            else:
+                raise NotImplementedError
         except NotImplementedError:
-            try:
-                method = await getattr(parent_resource, "render_POST_advanced", None)
-                ret = method(request=transaction.request, response=transaction.response)
-                if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
-                        and isinstance(ret[0], Resource):
-                    # Advanced handler
-                    resource, response = ret
-                    resource.path = lp
-                    resource.changed = True
-                    self._parent.root[resource.path] = resource
-                    transaction.resource = resource
-                    transaction.response = response
-                    if transaction.response.code is None:
-                        transaction.response.code = defines.Codes.CREATED.number
-                    return transaction
-                elif isinstance(ret, tuple) and len(ret) == 3 and isinstance(ret[1], Response) \
-                        and isinstance(ret[0], Resource):
-                    # Advanced handler separate
-                    resource, response, callback = ret
-                    ret = await self._handle_separate_advanced(transaction, callback)
-                    if not isinstance(ret, tuple) or \
-                            not (isinstance(ret[0], Resource) and isinstance(ret[1], Response)):  # pragma: no cover
-                        transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
-                        return transaction
-                    resource, response = ret
-                    resource.path = lp
-                    resource.changed = True
-                    self._parent.root[resource.path] = resource
-                    transaction.resource = resource
-                    transaction.response = response
-                    if transaction.response.code is None:
-                        transaction.response.code = defines.Codes.CREATED.number
-                    return transaction
-                else:
-                    raise NotImplementedError
-            except NotImplementedError:
-                transaction.response.code = defines.Codes.METHOD_NOT_ALLOWED.number
-                return transaction
-        if isinstance(resource, Resource):
-            pass
-        elif isinstance(resource, tuple) and len(resource) == 2:
-            resource, callback = resource
-            resource = await self._handle_separate(transaction, callback)
-            if not isinstance(resource, Resource):  # pragma: no cover
-                transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
-                return transaction
-        else:  # pragma: no cover
-            # Handle error
-            transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+            transaction.response.code = defines.Codes.METHOD_NOT_ALLOWED.number
             return transaction
-
-        resource.path = lp
-
-        if resource.etag is not None:
-            transaction.response.etag = resource.etag
-
-        transaction.response.location_path = resource.path
-
-        if resource.location_query is not None and len(resource.location_query) > 0:
-            transaction.response.location_query = resource.location_query
-
-        transaction.response.code = defines.Codes.CREATED.number
-        transaction.response.payload = None
-
-        assert (isinstance(resource, Resource))
-        if resource.etag is not None:
-            transaction.response.etag = resource.etag
-        if resource.max_age is not None:
-            transaction.response.max_age = resource.max_age
-
-        resource.changed = True
-
-        transaction.resource = resource
-
-        self._parent.root[resource.path] = resource
-
-        return transaction
+        # if isinstance(resource, Resource):
+        #     pass
+        # elif isinstance(resource, tuple) and len(resource) == 2:
+        #     resource, callback = resource
+        #     resource = await self._handle_separate(transaction, callback)
+        #     if not isinstance(resource, Resource):  # pragma: no cover
+        #         transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+        #         return transaction
+        # else:  # pragma: no cover
+        #     # Handle error
+        #     transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+        #     return transaction
+        #
+        # resource.path = lp
+        #
+        # if resource.etag is not None:
+        #     transaction.response.etag = resource.etag
+        #
+        # transaction.response.location_path = resource.path
+        #
+        # if resource.location_query is not None and len(resource.location_query) > 0:
+        #     transaction.response.location_query = resource.location_query
+        #
+        # transaction.response.code = defines.Codes.CREATED.number
+        # transaction.response.payload = None
+        #
+        # assert (isinstance(resource, Resource))
+        # if resource.etag is not None:
+        #     transaction.response.etag = resource.etag
+        # if resource.max_age is not None:
+        #     transaction.response.max_age = resource.max_age
+        #
+        # resource.changed = True
+        #
+        # transaction.resource = resource
+        #
+        # self._parent.root[resource.path] = resource
+        #
+        # return transaction
 
     async def create_resource(self, path, transaction):
         """
@@ -353,45 +346,41 @@ class ResourceLayer(object):
         """
 
         resource = transaction.resource
-        method = getattr(resource, 'render_DELETE', None)
+        method = getattr(transaction.resource, "render_DELETE", None)
 
         try:
-            ret = await method(request=transaction.request)
-        except NotImplementedError:
-            try:
-                method = getattr(transaction.resource, "render_DELETE_advanced", None)
-                ret = await method(request=transaction.request, response=transaction.response)
-                if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
-                        and isinstance(ret[0], bool):
-                    # Advanced handler
-                    delete, response = ret
-                    if delete:
-                        del self._parent.root[path]
-                    transaction.response = response
-                    if transaction.response.code is None:
-                        transaction.response.code = defines.Codes.DELETED.number
-                    return transaction
-                elif isinstance(ret, tuple) and len(ret) == 3 and isinstance(ret[1], Response) \
-                        and isinstance(ret[0], Resource):
-                    # Advanced handler separate
-                    resource, response, callback = ret
-                    ret = await self._handle_separate_advanced(transaction, callback)
-                    if not isinstance(ret, tuple) or \
-                            not (isinstance(ret[0], bool) and isinstance(ret[1], Response)):  # pragma: no cover
-                        transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
-                        return transaction
-                    delete, response = ret
-                    if delete:
-                        del self._parent.root[path]
-                    transaction.response = response
-                    if transaction.response.code is None:
-                        transaction.response.code = defines.Codes.DELETED.number
-                    return transaction
-                else:
-                    raise NotImplementedError
-            except NotImplementedError:
-                transaction.response.code = defines.Codes.METHOD_NOT_ALLOWED.number
+            ret = await method(request=transaction.request, response=transaction.response)
+            if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[1], Response) \
+                    and isinstance(ret[0], bool):
+                # Advanced handler
+                delete, response = ret
+                if delete:
+                    del self._parent.root[path]
+                transaction.response = response
+                if transaction.response.code is None:
+                    transaction.response.code = defines.Codes.DELETED.number
                 return transaction
+            elif isinstance(ret, tuple) and len(ret) == 3 and isinstance(ret[1], Response) \
+                    and isinstance(ret[0], Resource):
+                # Advanced handler separate
+                resource, response, callback = ret
+                ret = await self._handle_separate_advanced(transaction, callback)
+                if not isinstance(ret, tuple) or \
+                        not (isinstance(ret[0], bool) and isinstance(ret[1], Response)):  # pragma: no cover
+                    transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+                    return transaction
+                delete, response = ret
+                if delete:
+                    del self._parent.root[path]
+                transaction.response = response
+                if transaction.response.code is None:
+                    transaction.response.code = defines.Codes.DELETED.number
+                return transaction
+            else:
+                raise NotImplementedError
+        except NotImplementedError:
+            transaction.response.code = defines.Codes.METHOD_NOT_ALLOWED.number
+            return transaction
 
         if isinstance(ret, bool):
             pass
@@ -422,92 +411,81 @@ class ResourceLayer(object):
         :param transaction: the transaction
         :return: the transaction
         """
-        method = getattr(transaction.resource, 'render_GET', None)
-
-        # transaction.resource.actual_content_type = None
-        # Accept
-        # if transaction.request.accept is not None:
-        #     transaction.resource.actual_content_type = transaction.request.accept
-
-        # Render_GET
+        method = getattr(transaction.resource, "render_GET", None)
         try:
-            resource = await method(request=transaction.request)
-        except NotImplementedError:
-            try:
-                method = getattr(transaction.resource, "render_GET_advanced", None)
-                ret = await method(request=transaction.request, response=transaction.response)
-                if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[0], Resource) \
-                        and (isinstance(ret[1], Response) or ret[1] is None):
-                    # Advanced handler
-                    resource, response = ret
-                    transaction.resource = resource
-                    transaction.response = response
-                    if transaction.response and transaction.response.code is None:
-                        transaction.response.code = defines.Codes.CONTENT.number
-                    return transaction
-                elif isinstance(ret, tuple) and len(ret) == 3 and isinstance(ret[1], Response) \
-                        and isinstance(ret[0], Resource):
-                    # Advanced handler separate
-                    resource, response, callback = ret
-                    ret = await self._handle_separate_advanced(transaction, callback)
-                    if not isinstance(ret, tuple) or \
-                            not (isinstance(ret[0], Resource) and isinstance(ret[1], Response)):  # pragma: no cover
-                        transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
-                        return transaction
-                    resource, response = ret
-                    transaction.resource = resource
-                    transaction.response = response
-                    if transaction.response.code is None:
-                        transaction.response.code = defines.Codes.CONTENT.number
-                    return transaction
-                else:
-                    raise NotImplementedError
-            except NotImplementedError:
-                transaction.response.code = defines.Codes.METHOD_NOT_ALLOWED.number
+            ret = await method(request=transaction.request, response=transaction.response)
+            if isinstance(ret, tuple) and len(ret) == 2 and isinstance(ret[0], Resource) \
+                    and (isinstance(ret[1], Response) or ret[1] is None):
+                # Advanced handler
+                resource, response = ret
+                transaction.resource = resource
+                transaction.response = response
+                if transaction.response and transaction.response.code is None:
+                    transaction.response.code = defines.Codes.CONTENT.number
                 return transaction
-
-        if isinstance(resource, Resource):
-            pass
-        elif isinstance(resource, tuple) and len(resource) == 2:
-            resource, callback = resource
-            resource = await self._handle_separate(transaction, callback)
-            if not isinstance(resource, Resource):  # pragma: no cover
-                transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+            elif isinstance(ret, tuple) and len(ret) == 3 and isinstance(ret[1], Response) \
+                    and isinstance(ret[0], Resource):
+                # Advanced handler separate
+                resource, response, callback = ret
+                ret = await self._handle_separate_advanced(transaction, callback)
+                if not isinstance(ret, tuple) or \
+                        not (isinstance(ret[0], Resource) and isinstance(ret[1], Response)):  # pragma: no cover
+                    transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+                    return transaction
+                resource, response = ret
+                transaction.resource = resource
+                transaction.response = response
+                if transaction.response.code is None:
+                    transaction.response.code = defines.Codes.CONTENT.number
                 return transaction
-        else:  # pragma: no cover
-            # Handle error
-            transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
-            return transaction.response
-
-        if resource.etag in transaction.request.etag:
-            transaction.response.code = defines.Codes.VALID.number
-        else:
-            transaction.response.code = defines.Codes.CONTENT.number
-
-        try:
-            if resource.actual_content_type is not None \
-                    and resource.actual_content_type != defines.Content_types["text/plain"]:
-                transaction.response.content_type = resource.actual_content_type
-            if isinstance(resource.payload, bytes):
-                transaction.response.payload = resource.payload
             else:
-                transaction.response.encode_payload(resource.payload)
-            # if resource.actual_content_type is not None \
-            #         and resource.actual_content_type != defines.Content_types["text/plain"]:
-            #     transaction.response.content_type = resource.actual_content_type
-        except KeyError:
-            transaction.response.code = defines.Codes.NOT_ACCEPTABLE.number
-            return transaction.response
+                raise NotImplementedError
+        except NotImplementedError:
+            transaction.response.code = defines.Codes.METHOD_NOT_ALLOWED.number
+            return transaction
 
-        assert(isinstance(resource, Resource))
-        if resource.etag is not None:
-            transaction.response.etag = resource.etag
-        if resource.max_age is not None:
-            transaction.response.max_age = resource.max_age
-
-        transaction.resource = resource
-
-        return transaction
+        # if isinstance(resource, Resource):
+        #     pass
+        # elif isinstance(resource, tuple) and len(resource) == 2:
+        #     resource, callback = resource
+        #     resource = await self._handle_separate(transaction, callback)
+        #     if not isinstance(resource, Resource):  # pragma: no cover
+        #         transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+        #         return transaction
+        # else:  # pragma: no cover
+        #     # Handle error
+        #     transaction.response.code = defines.Codes.INTERNAL_SERVER_ERROR.number
+        #     return transaction.response
+        #
+        # if resource.etag in transaction.request.etag:
+        #     transaction.response.code = defines.Codes.VALID.number
+        # else:
+        #     transaction.response.code = defines.Codes.CONTENT.number
+        #
+        # try:
+        #     if resource.actual_content_type is not None \
+        #             and resource.actual_content_type != defines.Content_types["text/plain"]:
+        #         transaction.response.content_type = resource.actual_content_type
+        #     if isinstance(resource.payload, bytes):
+        #         transaction.response.payload = resource.payload
+        #     else:
+        #         transaction.response.encode_payload(resource.payload)
+        #     # if resource.actual_content_type is not None \
+        #     #         and resource.actual_content_type != defines.Content_types["text/plain"]:
+        #     #     transaction.response.content_type = resource.actual_content_type
+        # except KeyError:
+        #     transaction.response.code = defines.Codes.NOT_ACCEPTABLE.number
+        #     return transaction.response
+        #
+        # assert(isinstance(resource, Resource))
+        # if resource.etag is not None:
+        #     transaction.response.etag = resource.etag
+        # if resource.max_age is not None:
+        #     transaction.response.max_age = resource.max_age
+        #
+        # transaction.resource = resource
+        #
+        # return transaction
 
     async def discover(self, transaction):
         """

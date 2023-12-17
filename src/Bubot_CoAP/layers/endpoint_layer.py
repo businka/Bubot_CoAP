@@ -23,6 +23,26 @@ class EndpointLayer:
     def unicast_endpoints(self):
         return self._unicast_endpoints
 
+    async def start_client(self, uri: str, **kwargs):
+        """
+
+        :param uri:
+        :param kwargs:
+        :return:
+        """
+
+        _uri = parse_uri2(uri)
+        try:
+            endpoint = supported_scheme[_uri['scheme']]
+        except KeyError:
+            raise TypeError(f'Unsupported scheme \'{_uri["scheme"]}\'')
+        address = _uri['address']
+        epu = endpoint(**kwargs)
+        await epu.start_client(self._server, address)
+        self.add(epu)
+
+        return epu
+
     async def add_by_netloc(self, uri: str, **kwargs):
         """
 
@@ -154,14 +174,15 @@ class EndpointLayer:
         scheme = message.scheme
         dest_address = message.destination
         family = socket.getaddrinfo(dest_address[0], None)[0][0]
-        if source_address:
+        if not source_address[0]:
+            source_address = (list(self._unicast_endpoints[scheme][family].keys())[0], None)
+        if source_address[0]:
             _tmp = self.unicast_endpoints[scheme][family][source_address[0]]
             if source_address[1] is None:
                 return _tmp[list(_tmp.keys())[0]]
             return _tmp.get(source_address[1])
         # raise Exception('source address not defined')
-        # else:
-        # return self._unicast_endpoints[scheme][family]['default']
+
 
     def close(self):
         def _close(endpoints):

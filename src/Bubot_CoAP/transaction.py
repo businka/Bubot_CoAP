@@ -28,8 +28,8 @@ class Transaction(object):
         self.retransmit_thread = None
         self.retransmit_stop = None
         self.lock = asyncio.Lock()
+        self.over_tcp = request.scheme.endswith('tcp')
         # self.timer = None
-
         self.cacheHit = False
         self.cached_element = None
 

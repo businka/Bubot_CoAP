@@ -18,7 +18,7 @@ class CoapDatagramProtocol(DatagramProtocol):
         self.endpoint = endpoint
 
     def connection_made(self, transport):
-        logger.debug(f'connection_made')
+        logger.debug(f'udp connection_made')
         self.transport = transport
 
     def datagram_received(self, data, client_address):

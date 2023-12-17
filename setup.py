@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name='Bubot_CoAP',
-    version='1.0.8',
+    version='2.0.0',
     license='MIT',
     author='Razgovorov Mikhail',
     author_email='1338833@gmail.com',

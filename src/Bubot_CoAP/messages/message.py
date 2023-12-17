@@ -42,8 +42,7 @@ class Message(object):
         self._version = 1
         self._opt = Options()
         self._scheme = None
-        self.ep_source = None
-        self.ep_destination = None
+        self.endpoint = None
 
     @property
     def version(self):
@@ -495,6 +494,15 @@ class Message(object):
         else:
             self._options.append(option)
 
+    def get_option(self, option: Option, *args):
+        for o in list(self._options):
+            assert isinstance(o, Option)
+            if o.name == option.name:
+                return o.value
+        if args:
+            return args[0]
+        raise KeyError(option.name)
+
     def del_option(self, option):
         """
         Delete an option from the message
@@ -576,11 +584,7 @@ class Message(object):
 
         :return: the Content-Type value or 0 if not specified by the response
         """
-        value = 0
-        for option in self.options:
-            if option.number == defines.OptionRegistry.CONTENT_TYPE.number:
-                value = int(option.value)
-        return value
+        return self.get_option(defines.OptionRegistry.CONTENT_TYPE, 0)
 
     @content_type.setter
     def content_type(self, content_type):
@@ -590,9 +594,7 @@ class Message(object):
         :type content_type: int
         :param content_type: the Content-Type
         """
-        option = Option()
-        option.number = defines.OptionRegistry.CONTENT_TYPE.number
-        option.value = int(content_type)
+        option = Option(defines.OptionRegistry.CONTENT_TYPE, int(content_type))
         self.add_option(option)
 
     @content_type.deleter
@@ -769,11 +771,7 @@ class Message(object):
 
         :return: the Size2 value
         """
-        value = None
-        for option in self.options:
-            if option.number == defines.OptionRegistry.SIZE2.number:
-                value = option.value
-        return value
+        return self.get_option(defines.OptionRegistry.SIZE2, None)
 
     @size2.setter
     def size2(self, value):
@@ -782,9 +780,7 @@ class Message(object):
 
         :param value: the Block2 value
         """
-        option = Option()
-        option.number = defines.OptionRegistry.SIZE2.number
-        option.value = value
+        option = Option(defines.OptionRegistry.SIZE2, value)
         self.add_option(option)
 
     @size2.deleter

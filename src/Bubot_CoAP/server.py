@@ -17,7 +17,6 @@ from .layers.resource_layer import ResourceLayer
 from .messages.message import Message
 from .messages.request import Request
 from .resources.resource import Resource
-from .serializer_udp import Serializer
 from .utils import Tree, Timer
 
 __author__ = 'Giacomo Tanganelli'
@@ -29,7 +28,7 @@ class Server:
     Implementation of the CoAP server
     """
 
-    def __init__(self, starting_mid=None, cb_ignore_listen_exception=None, **kwargs):
+    def __init__(self, *, starting_mid=None, cb_ignore_listen_exception=None, client_manager=None, **kwargs):
         """
         Initialize the server.
 
@@ -61,6 +60,7 @@ class Server:
         # Resource directory
         root = Resource('root', self, visible=False, observable=False, allow_children=False)
         root.path = '/'
+        self.client_manager = client_manager
         self.root = Tree()
         self.root["/"] = root
         self._serializer = None
@@ -140,9 +140,12 @@ class Server:
                 await self.send_datagram(transaction.response)
         await asyncio.sleep(0)
 
-    async def send_message(self, message, no_response=False, **kwargs):
+    async def send_message(self, message, no_response=False, endpoint=None, **kwargs):
         try:
             if isinstance(message, Request):
+                if message.token is None:
+                    message.token = self.message_layer.fetch_token()
+
                 request = self.request_layer.send_request(message)
                 request = self.observe_layer.send_request(request)
                 request = self.block_layer.send_request(request)
@@ -152,7 +155,7 @@ class Server:
                     logger.debug(f'Send no response request {request}')
                     return
                 transaction = self.message_layer.send_request(request)
-                await self.send_datagram(transaction.request, **kwargs)
+                await self.send_datagram(transaction.request, endpoint=endpoint, **kwargs)
                 logger.info("Send request     - " + str(request))
 
                 if transaction.request.type == defines.Types["CON"]:
@@ -163,13 +166,13 @@ class Server:
             elif isinstance(message, Message):
                 message = self.observe_layer.send_empty(message)
                 message = self.message_layer.send_empty(None, None, message)
-                await self.send_datagram(message, **kwargs)
+                await self.send_datagram(message, endpoint=endpoint, **kwargs)
         except (asyncio.TimeoutError, asyncio.CancelledError) as err:
             raise err
         except Exception as err:
             raise ExtException(parent=err)
 
-    async def send_datagram(self, message, **kwargs):
+    async def send_datagram(self, message, *, endpoint=None, **kwargs):
         """
         Send a message through the udp socket.
 
@@ -180,16 +183,15 @@ class Server:
             # if not self.stopped.isSet():
             # host, port = message.destination
             # host, port = message.source
-            endpoint = self.endpoint_layer.find_sending_endpoint(message)
-            if not endpoint:
-                raise KeyError(f'endpoint for {message.source}')
-            async with endpoint.lock:
-                message.source = endpoint.address
-                logger.debug(f"send datagram {message}")
-                serializer = Serializer()
-                raw_message = serializer.serialize(message)
+            if endpoint is None:
+                endpoint = self.endpoint_layer.find_sending_endpoint(message)
 
-                endpoint.send(bytes(raw_message), message.destination, **kwargs)
+            if not endpoint:
+                raise KeyError(
+                    f'Not found endpoint for {message.source}')  # todo исключения не обрабатываются при отправке из resonse
+
+            async with endpoint.lock:
+                await endpoint.send_message(message, **kwargs)
         except Exception as err:
             raise err
 
@@ -242,6 +244,9 @@ class Server:
             del (self.root[actual_path])
         return res
 
+    async def start_client(self, url, **kwargs):
+        return await self.endpoint_layer.start_client(url, **kwargs)
+
     async def add_endpoint(self, url: str, **kwargs):
         """
         Helper function to add endpoint to the endpoint directory during server initialization.
@@ -278,7 +283,11 @@ class Server:
         transaction = self.message_layer.send_request(transaction.request)
         # ... but don't forget to reset the acknowledge flag
         transaction.request.acknowledged = False
-        await self.send_datagram(transaction.request)
+        try:
+            await self.send_datagram(transaction.request)
+        except Exception as err:
+            logger.error(err)
+            transaction.completed = True
         if transaction.request.type == defines.Types["CON"]:
             await self.start_retransmission(transaction, transaction.request)
 
@@ -291,14 +300,14 @@ class Server:
         :type message: Message
         :param message: the message that needs the retransmission task
         """
-        async with transaction.lock:
-            if message.type == defines.Types['CON']:
-                future_time = random.uniform(defines.ACK_TIMEOUT, (defines.ACK_TIMEOUT * defines.ACK_RANDOM_FACTOR))
-                transaction.retransmit_thread = self.loop.create_task(
-                    self._retransmit(transaction, message, future_time, 0))
-                transaction.retransmit_stop = asyncio.Event()
-                self.to_be_stopped.append(transaction.retransmit_stop)
-                await asyncio.sleep(0.001)
+        # async with transaction.lock:
+        if message.type == defines.Types['CON'] and not transaction.over_tcp:
+            future_time = random.uniform(defines.ACK_TIMEOUT, (defines.ACK_TIMEOUT * defines.ACK_RANDOM_FACTOR))
+            transaction.retransmit_thread = self.loop.create_task(
+                self._retransmit(transaction, message, future_time, 0))
+            transaction.retransmit_stop = asyncio.Event()
+            self.to_be_stopped.append(transaction.retransmit_stop)
+            await asyncio.sleep(0.001)
 
     async def _retransmit(self, transaction, message, future_time, retransmit_count):
         """

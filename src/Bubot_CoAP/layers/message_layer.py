@@ -97,13 +97,13 @@ class MessageLayer(object):
             key_mid = utils.str_append_hash(host, port, request.mid)
             key_token = utils.str_append_hash(host, port, request.token)
 
-            if key_mid in list(self._transactions.keys()):
+            if request.mid and key_mid in list(self._transactions.keys()):
                 # Duplicated
                 self._transactions[key_mid].request.duplicated = True
                 return self._transactions[key_mid]
         request.timestamp = time.time()
 
-        transaction = Transaction(request=request, timestamp=request.timestamp)
+        # transaction = Transaction(request=request, timestamp=request.timestamp)
         # async with transaction.lock:
         #     self._transactions[key_mid] = transaction
         #     self._transactions_token[key_token] = transaction
@@ -177,7 +177,7 @@ class MessageLayer(object):
         :rtype : Transaction
         :return: the transaction to which the message belongs to
         """
-        logger.info("receive_empty - " + str(message))
+        logger.info("Receive empty    - " + str(message))
         try:
             host, port = message.source
         except AttributeError:
@@ -333,6 +333,7 @@ class MessageLayer(object):
                 message.code = 0
                 message.destination = transaction.request.source
                 message.source = transaction.request.destination
+                message.scheme = transaction.request.scheme
             elif transaction.response == related:
                 transaction.response.acknowledged = True
                 transaction.completed = True
@@ -341,6 +342,7 @@ class MessageLayer(object):
                 message.token = transaction.response.token
                 message.destination = transaction.response.source
                 message.source = transaction.response.destination
+                message.scheme = transaction.response.scheme
 
         elif message.type == defines.Types["RST"]:
             if transaction.request == related:
@@ -351,6 +353,7 @@ class MessageLayer(object):
                 message.code = 0
                 message.token = transaction.request.token
                 message.destination = transaction.request.source
+                message.scheme = transaction.request.scheme
             elif transaction.response == related:
                 transaction.response.rejected = True
                 transaction.completed = True
@@ -360,4 +363,5 @@ class MessageLayer(object):
                 message.code = 0
                 message.token = transaction.response.token
                 message.destination = transaction.response.source
+                message.scheme = transaction.response.scheme
         return message

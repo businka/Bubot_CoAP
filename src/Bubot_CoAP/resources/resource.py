@@ -440,16 +440,7 @@ class Resource(object):
         self.location_query = request.uri_query
         self.payload = (request.content_type, request.payload)
 
-    def render_GET(self, request):
-        """
-        Method to be redefined to render a GET request on the resource.
-
-        :param request: the request
-        :return: the resource
-        """
-        raise NotImplementedError(self.__class__.__name__)
-
-    def render_GET_advanced(self, request, response):
+    def render_GET(self, request, response):
         """
         Method to be redefined to render a GET request on the resource.
 
@@ -459,16 +450,7 @@ class Resource(object):
         """
         raise NotImplementedError
 
-    def render_PUT(self, request):
-        """
-        Method to be redefined to render a PUTT request on the resource.
-
-        :param request: the request
-        :return: the resource
-        """
-        raise NotImplementedError
-
-    def render_PUT_advanced(self, request, response):
+    def render_PUT(self, request, response):
         """
         Method to be redefined to render a PUTT request on the resource.
 
@@ -478,16 +460,7 @@ class Resource(object):
         """
         raise NotImplementedError
 
-    def render_POST(self, request):
-        """
-        Method to be redefined to render a POST request on the resource.
-
-        :param request: the request
-        :return: the resource
-        """
-        raise NotImplementedError
-
-    def render_POST_advanced(self, request, response):
+    def render_POST(self, request, response):
         """
         Method to be redefined to render a POST request on the resource.
 
@@ -497,16 +470,7 @@ class Resource(object):
         """
         raise NotImplementedError
 
-    def render_DELETE(self, request):
-        """
-        Method to be redefined to render a DELETE request on the resource.
-
-        :param request: the request
-        :return: a boolean
-        """
-        raise NotImplementedError
-
-    def render_DELETE_advanced(self, request, response):
+    def render_DELETE(self, request, response):
         """
         Method to be redefined to render a DELETE request on the resource.
 

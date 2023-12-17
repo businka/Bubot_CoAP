@@ -2,10 +2,23 @@
 import asyncio
 import binascii
 import random
-import string
+from socket import AF_INET, AF_INET6, getaddrinfo
 from urllib.parse import urlparse, SplitResult
 
 __author__ = 'Giacomo Tanganelli'
+
+
+def calc_family_by_address(address):
+    if address[0] == '' or address[0] is None:
+        family = AF_INET
+        address = ('', address[1])
+    elif address[0] == '::':
+        family = AF_INET6
+        address = ('[::]', address[1])
+    else:
+        family = getaddrinfo(address[0], address[1])[0][0]
+        address = address
+    return family, address
 
 
 def str_append_hash(*args):

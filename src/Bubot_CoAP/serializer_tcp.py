@@ -317,10 +317,10 @@ class SerializerTcp(Serializer):
                 values.append(_data)
 
         datagram = None
-        if values[1] is None:
-            values[1] = 0
-        if values[2] is None:
-            values[2] = 0
+        # if values[1] is None:
+        #     values[1] = 0
+        # if values[2] is None:
+        #     values[2] = 0
         try:
             s = struct.Struct(fmt)
             datagram = ctypes.create_string_buffer(s.size)

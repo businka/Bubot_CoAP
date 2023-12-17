@@ -44,10 +44,7 @@ class Request(Message):
         path = tmp[0]
         paths = path.split("/")
         for p in paths:
-            option = Option()
-            option.number = defines.OptionRegistry.URI_PATH.number
-            option.value = p
-            self.add_option(option)
+            self.add_option(Option(defines.OptionRegistry.URI_PATH, p))
         if len(tmp) > 1:
             query = tmp[1]
             self.uri_query = query
@@ -84,10 +81,7 @@ class Request(Message):
         del self.uri_query
         queries = value.split("&")
         for q in queries:
-            option = Option()
-            option.number = defines.OptionRegistry.URI_QUERY.number
-            option.value = str(q)
-            self.add_option(option)
+            self.add_option(Option(defines.OptionRegistry.URI_QUERY, q))
 
     @uri_query.deleter
     def uri_query(self):
@@ -313,7 +307,5 @@ class Request(Message):
             if not isinstance(value[key], list):
                 raise Exception('value query param must be only list')
             for elem in value[key]:
-                option = Option()
-                option.number = defines.OptionRegistry.URI_QUERY.number
-                option.value = str(f'{key}={elem}')
+                option = Option(defines.OptionRegistry.URI_QUERY, str(f'{key}={elem}'))
                 self.add_option(option)

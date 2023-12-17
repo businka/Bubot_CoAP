@@ -8,12 +8,15 @@ class Option(object):
     """
     Class to handle the CoAP Options.
     """
-    def __init__(self):
+    def __init__(self, option=None, value=None):
         """
         Data structure to store options.
         """
         self._number = None
         self._value = None
+        if option is not None:
+            self.number = option.number
+            self.value = value
 
     @property
     def number(self):

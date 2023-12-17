@@ -128,6 +128,7 @@ class Response(Message):
     def init_from_request(cls, request):
         self = cls()
         self.destination = request.source
+        self.source = request.destination
         self.scheme = request.scheme
         self.token = request.token
         return self

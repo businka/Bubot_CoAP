@@ -2,7 +2,7 @@ import asyncio
 from unittest import IsolatedAsyncioTestCase
 
 from Bubot_CoAP.server import Server
-from Bubot_CoAP.coap_protocol import CoapProtocol
+from Bubot_CoAP.coap_tcp_protocol import CoapProtocol
 
 
 class TestTcpServer(IsolatedAsyncioTestCase):
