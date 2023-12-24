@@ -301,7 +301,7 @@ class Server:
         :param message: the message that needs the retransmission task
         """
         # async with transaction.lock:
-        if message.type == defines.Types['CON'] and not transaction.over_tcp:
+        if message.type == defines.Types['CON'] and message.acknowledged and not transaction.over_tcp:
             future_time = random.uniform(defines.ACK_TIMEOUT, (defines.ACK_TIMEOUT * defines.ACK_RANDOM_FACTOR))
             transaction.retransmit_thread = self.loop.create_task(
                 self._retransmit(transaction, message, future_time, 0))

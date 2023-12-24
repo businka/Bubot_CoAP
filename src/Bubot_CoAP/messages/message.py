@@ -358,7 +358,7 @@ class Message(object):
 
         :return: True, if is acknowledged
         """
-        return self._acknowledged
+        return bool(self._acknowledged)
 
     @acknowledged.setter
     def acknowledged(self, value):

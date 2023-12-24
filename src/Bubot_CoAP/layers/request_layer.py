@@ -55,7 +55,6 @@ class RequestLayer(object):
         wkc_resource_is_defined = defines.DISCOVERY_URL in self._server.root
         path = str("/" + transaction.request.uri_path)
         transaction.response = Response.init_from_request(transaction.request)
-        transaction.response.source = transaction.request.destination
         if path == defines.DISCOVERY_URL and not wkc_resource_is_defined:
             transaction = await self._server.resource_layer.discover(transaction)
         else:

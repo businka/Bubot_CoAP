@@ -155,7 +155,7 @@ class MessageLayer(object):
                 logger.warning("Tokens does not match -  response message " + str(host) + ":" + str(port))
                 return None, False
         else:
-            logger.warning("Un-Matched incoming response message " + str(host) + ":" + str(port))
+            logger.warning(f"Un-Matched incoming response {response}")
             return None, False
         send_ack = False
         if response.type == defines.Types["CON"]:
@@ -308,7 +308,6 @@ class MessageLayer(object):
         :type message: Message
         :param message: the ACK or RST message to send
         """
-        logger.info("send_empty - " + str(message))
         if transaction is None:
             try:
                 host, port = message.destination
@@ -323,6 +322,7 @@ class MessageLayer(object):
                 transaction = self._transactions_token[key_token]
                 related = transaction.response
             else:
+                logger.info("send_empty - " + str(message))
                 return message
 
         if message.type == defines.Types["ACK"]:
@@ -364,4 +364,5 @@ class MessageLayer(object):
                 message.token = transaction.response.token
                 message.destination = transaction.response.source
                 message.scheme = transaction.response.scheme
+        logger.info("send_empty - " + str(message))
         return message

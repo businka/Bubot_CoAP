@@ -79,7 +79,7 @@ class CoapDatagramProtocol(DatagramProtocol):
         if transaction.request.duplicated and transaction.completed:
             logger.debug("message duplicated, transaction completed")
             if transaction.response is not None:
-                self.server.send_datagram(transaction.response)
+                await self.server.send_datagram(transaction.response)
             return
         elif transaction.request.duplicated and not transaction.completed:
             logger.debug("message duplicated, transaction NOT completed")
