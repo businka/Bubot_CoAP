@@ -1,4 +1,4 @@
 twine
 cbor2
-aio_dtls
+aio_dtls==0.0.4
 

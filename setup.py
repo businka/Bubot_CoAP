@@ -10,8 +10,8 @@ setuptools.setup(
     description='python library to the CoAP protocol.',
     install_requires=[
         'cbor2',
-        'aio_dtls',
-        'Bubot_Helpers'
+        'aio_dtls==0.0.4',
+        'Bubot_Helpers>=4.0.0'
     ],
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
